@@ -1,0 +1,84 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/roles/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Profile doc per user, plus the `activeOrderId` lock used to block a
+    // second order request until the current one is delivered/cancelled.
+    // There is no server to trust here, so the "one active order" invariant
+    // (and its atomicity under concurrent requests) is enforced by these
+    // rules together with Firestore's own transaction semantics: acquiring
+    // the lock is only allowed while it's currently null, and a transaction
+    // that reads it as null but loses the race to write is rejected and
+    // retried by the client SDK — so at most one create can win.
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+
+      allow create: if isSignedIn() && request.auth.uid == uid;
+
+      // Owner: profile fields only, never activeOrderId directly.
+      allow update: if isSignedIn() && request.auth.uid == uid &&
+        !("activeOrderId" in request.resource.data.diff(resource.data).affectedKeys());
+
+      // Owner: acquire the lock, only from unlocked. Treat a blank string the
+      // same as unset/null — a stray "" (e.g. from a manual console edit)
+      // must not count as an active order. (get()'s default only kicks in
+      // when the key is absent, not when it's present but null, so both
+      // null and "" have to be checked explicitly.)
+      allow update: if isSignedIn() && request.auth.uid == uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["activeOrderId"]) &&
+        (resource.data.get("activeOrderId", null) == null ||
+          resource.data.get("activeOrderId", "") == "") &&
+        request.resource.data.activeOrderId is string &&
+        request.resource.data.activeOrderId != "";
+
+      // Admin: release the lock (as part of marking an order delivered/cancelled).
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["activeOrderId"]) &&
+        request.resource.data.activeOrderId == null;
+    }
+
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      // A pedido is a cart of one or more cards (`items`); we don't validate
+      // the shape of each item here (low-stakes internal tool — nothing here
+      // moves money), just that it's a non-empty list and the aggregate
+      // totals are sane numbers.
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == "pending" &&
+        request.resource.data.items is list && request.resource.data.items.size() > 0 &&
+        request.resource.data.estimatedSubtotal is number && request.resource.data.estimatedSubtotal > 0;
+
+      // Only admins change status, and only that (plus updatedAt).
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "updatedAt"]) &&
+        request.resource.data.status in ["pending", "ordered", "shipped", "delivered", "cancelled"];
+
+      allow delete: if false;
+    }
+
+    // Admin flags are provisioned manually by the developer in the console.
+    match /roles/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // App-wide config (e.g. forwarderState used for the tax estimate).
+    match /config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

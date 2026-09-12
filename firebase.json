@@ -1,0 +1,41 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "auth": { "port": 9099 },
+    "firestore": { "port": 8080 },
+    "ui": { "enabled": true },
+    "singleProjectMode": true
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "tcgimport-pe",
+          "appId": "1:656679731995:android:30508d910bf0977a3ec9be",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "tcgimport-pe",
+          "appId": "1:656679731995:ios:7c3c6ebcffafab143ec9be",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "tcgimport-pe",
+          "configurations": {
+            "android": "1:656679731995:android:30508d910bf0977a3ec9be",
+            "ios": "1:656679731995:ios:7c3c6ebcffafab143ec9be",
+            "web": "1:656679731995:web:f8eae1a0429f4dfc3ec9be"
+          }
+        }
+      }
+    }
+  }
+}

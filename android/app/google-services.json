@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "656679731995",
+    "project_id": "tcgimport-pe",
+    "storage_bucket": "tcgimport-pe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:656679731995:android:30508d910bf0977a3ec9be",
+        "android_client_info": {
+          "package_name": "pe.fosa.tcgimport"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "656679731995-f1p9drv6bo4uek1193ateg0568gbtmgq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "pe.fosa.tcgimport",
+            "certificate_hash": "ef0dd33be3b6fc0ceadac228587692bc0513a861"
+          }
+        },
+        {
+          "client_id": "656679731995-mokk1napdq8jt0qsnc69assndmv8rvpv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCHyIojtgL7JTiByZh9c01VeVh-pTcG6lc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "656679731995-mokk1napdq8jt0qsnc69assndmv8rvpv.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "656679731995-0qr164ggk6mvgj0fv28qunt524qpmljn.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "pe.fosa.tcgimport"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
