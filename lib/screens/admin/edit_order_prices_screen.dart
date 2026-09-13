@@ -12,7 +12,7 @@ final _currency = NumberFormat.simpleCurrency(name: 'USD');
 /// are often stale. Editing any line recalculates tax, margin, Peru shipping
 /// and the total live — on the same fee schedule the order was originally
 /// quoted with — and saving parks the order in [OrderStatus.priceReview]
-/// until the customer approves the new total by email/in-app.
+/// until the customer approves the new total next time they open the app.
 class EditOrderPricesScreen extends StatefulWidget {
   const EditOrderPricesScreen({super.key, required this.order});
 
@@ -92,9 +92,10 @@ class _EditOrderPricesScreenState extends State<EditOrderPricesScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'El pedido quedará en "${OrderStatus.priceReview.label}" y se le '
-              'enviará un correo a ${widget.order.userDisplayName} para que dé '
-              'su conformidad. Recién ahí podrás marcarlo como comprado.',
+              'El pedido quedará en "${OrderStatus.priceReview.label}" y '
+              '${widget.order.userDisplayName} verá el nuevo precio al entrar '
+              'a la app para dar su conformidad. Recién ahí podrás marcarlo '
+              'como comprado.',
               style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],
@@ -120,7 +121,7 @@ class _EditOrderPricesScreenState extends State<EditOrderPricesScreen> {
 
     setState(() => _saving = true);
     try {
-      final result = await OrderService.instance.applyPriceAdjustment(
+      final totals = await OrderService.instance.applyPriceAdjustment(
         order: widget.order,
         items: _editedItems,
         note: _noteCtrl.text,
@@ -130,10 +131,8 @@ class _EditOrderPricesScreenState extends State<EditOrderPricesScreen> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            result.emailQueued
-                ? 'Precio actualizado. Se envió el aviso a ${result.notifiedEmail}.'
-                : 'Precio actualizado, pero no se pudo enviar el correo '
-                      '(${result.emailError}). Avísale al cliente por otro medio.',
+            'Precio actualizado a ${_currency.format(totals.total)}. '
+            '${widget.order.userDisplayName} verá el cambio al entrar a la app.',
           ),
           duration: const Duration(seconds: 6),
         ),
@@ -231,7 +230,7 @@ class _EditOrderPricesScreenState extends State<EditOrderPricesScreen> {
                         width: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.mark_email_read_outlined),
+                    : const Icon(Icons.price_change_outlined),
                 label: Text(
                   _saving
                       ? 'Guardando…'
@@ -345,8 +344,7 @@ class _ItemPriceEditor extends StatelessWidget {
                     decoration: InputDecoration(
                       labelText: 'Precio unitario',
                       prefixText: '\$ ',
-                      helperText:
-                          'Antes: ${_currency.format(item.unitPrice)}',
+                      helperText: 'Antes: ${_currency.format(item.unitPrice)}',
                     ),
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
@@ -414,12 +412,7 @@ class _ItemPriceEditor extends StatelessWidget {
 }
 
 class _TotalRow extends StatelessWidget {
-  const _TotalRow(
-    this.label,
-    this.amount, {
-    this.bold = false,
-    this.color,
-  });
+  const _TotalRow(this.label, this.amount, {this.bold = false, this.color});
 
   final String label;
   final double amount;

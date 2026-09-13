@@ -81,7 +81,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         children: OrderStatus.values
             // "Ajuste de precio" isn't a state to be set by hand: it's what
             // saving new prices in EditOrderPricesScreen puts the order in,
-            // together with the email asking the customer to approve them.
+            // waiting on the customer to approve them from the app.
             .where((s) => s != OrderStatus.priceReview)
             .map(
               (s) => SimpleDialogOption(
@@ -225,9 +225,8 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 enabled: !_exporting,
                 onSelected: (kind) => switch (kind) {
                   _ExportKind.pending => _runExport(
-                    () => OrderExportService.instance.exportPendingOrders(
-                      orders,
-                    ),
+                    () =>
+                        OrderExportService.instance.exportPendingOrders(orders),
                     emptyMessage: 'No hay pedidos pendientes por exportar.',
                   ),
                   _ExportKind.purchased => _runExport(
