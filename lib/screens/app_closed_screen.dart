@@ -6,7 +6,8 @@ import 'order_history_screen.dart';
 
 /// Shown to signed-in non-admin users instead of [HomeScreen] while
 /// `config/settings.closed` is true in Firestore — e.g. once a promotional
-/// intake period ends. Admins are never gated by this screen. Users can't
+/// intake period ends. The flag is toggled live from the admin panel's
+/// "Convocatoria" switch. Admins are never gated by this screen. Users can't
 /// start a new order from here, but can still view the ones they already
 /// placed via [OrderHistoryScreen].
 class AppClosedScreen extends StatelessWidget {

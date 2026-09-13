@@ -58,3 +58,69 @@ double marginRateFor(double unitPrice) {
 double marginAmountForItem(OrderItem item) {
   return item.unitPrice * item.quantity * marginRateFor(item.unitPrice);
 }
+
+/// The aggregate money figures for a cart, computed in one place so that a
+/// staff reprice (see `OrderService.applyPriceAdjustment`) lands on exactly
+/// the same arithmetic — same rounding, same order of operations — that the
+/// original quote was built with.
+///
+/// [adminPricing] mirrors how the order was first priced: orders placed by an
+/// admin carry no service margin and a reduced per-card Peru shipping fee, so
+/// a later reprice has to keep applying that same schedule.
+class OrderTotals {
+  final double subtotal;
+  final double taxRate;
+  final double tax;
+  final double margin;
+  final double internationalShipping;
+  final double total;
+  final int totalQuantity;
+
+  const OrderTotals({
+    required this.subtotal,
+    required this.taxRate,
+    required this.tax,
+    required this.margin,
+    required this.internationalShipping,
+    required this.total,
+    required this.totalQuantity,
+  });
+
+  factory OrderTotals.forItems(
+    List<OrderItem> items, {
+    required bool adminPricing,
+  }) {
+    final rawSubtotal = items.fold<double>(
+      0,
+      (acc, item) => acc + item.lineTotal,
+    );
+    final subtotal = double.parse(rawSubtotal.toStringAsFixed(2));
+    final tax = double.parse((subtotal * fixedTaxRate).toStringAsFixed(2));
+    final margin = adminPricing
+        ? 0.0
+        : double.parse(
+            items
+                .fold<double>(0, (acc, item) => acc + marginAmountForItem(item))
+                .toStringAsFixed(2),
+          );
+    final totalQuantity = items.fold<int>(
+      0,
+      (acc, item) => acc + item.quantity,
+    );
+    final internationalShipping = double.parse(
+      (totalQuantity * internationalShippingFeeFor(adminPricing))
+          .toStringAsFixed(2),
+    );
+    return OrderTotals(
+      subtotal: subtotal,
+      taxRate: fixedTaxRate,
+      tax: tax,
+      margin: margin,
+      internationalShipping: internationalShipping,
+      total: double.parse(
+        (subtotal + tax + margin + internationalShipping).toStringAsFixed(2),
+      ),
+      totalQuantity: totalQuantity,
+    );
+  }
+}

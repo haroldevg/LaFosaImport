@@ -46,6 +46,18 @@ service cloud.firestore {
       allow update: if isAdmin() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(["activeOrderId"]) &&
         request.resource.data.activeOrderId == null;
+
+      // Owner: release their own lock, but only once the order it points at
+      // is already finished — which is what lets someone who rejected a price
+      // adjustment (cancelling that order) immediately place a new one,
+      // without opening a way to dodge the one-active-order rule while an
+      // order is still live.
+      allow update: if isSignedIn() && request.auth.uid == uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["activeOrderId"]) &&
+        request.resource.data.activeOrderId == null &&
+        resource.data.get("activeOrderId", null) != null &&
+        resource.data.get("activeOrderId", "") != "" &&
+        get(/databases/$(database)/documents/orders/$(resource.data.activeOrderId)).data.status in ["cancelled", "delivered"];
     }
 
     match /orders/{orderId} {
@@ -61,10 +73,30 @@ service cloud.firestore {
         request.resource.data.items is list && request.resource.data.items.size() > 0 &&
         request.resource.data.estimatedSubtotal is number && request.resource.data.estimatedSubtotal > 0;
 
-      // Only admins change status, and only that (plus updatedAt).
+      // Admins change the status and, when TCGPlayer prices move, the prices
+      // themselves: rewriting `items` forces every derived total to be
+      // rewritten with it (the app recomputes them from the same pricing
+      // config the quote was built with), and the order lands in
+      // "priceReview" until the customer approves it.
       allow update: if isAdmin() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "updatedAt"]) &&
-        request.resource.data.status in ["pending", "ordered", "shipped", "delivered", "cancelled"];
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "status", "updatedAt", "userEmail", "items", "priceAdjustment",
+          "estimatedTaxRate", "estimatedSubtotal", "estimatedTax",
+          "estimatedMargin", "estimatedInternationalShipping", "estimatedTotal"
+        ]) &&
+        request.resource.data.status in
+          ["pending", "priceReview", "priceConfirmed", "awaitingPayment",
+           "ordered", "shipped", "inTransit", "delivered", "cancelled"];
+
+      // Owner: answer a price adjustment — approve it (clearing the staff to
+      // buy) or reject it (cancelling the order). Only ever from priceReview,
+      // so this can't be used to revive or re-route an order at any other
+      // point of its lifecycle.
+      allow update: if isSignedIn() &&
+        resource.data.userId == request.auth.uid &&
+        resource.data.status == "priceReview" &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "updatedAt", "priceAdjustment"]) &&
+        request.resource.data.status in ["priceConfirmed", "cancelled"];
 
       allow delete: if false;
     }
@@ -73,6 +105,15 @@ service cloud.firestore {
     match /roles/{uid} {
       allow read: if isSignedIn() && request.auth.uid == uid;
       allow write: if false;
+    }
+
+    // Outbox for the "Trigger Email from Firestore" extension: dropping a
+    // document here is what actually sends a mail (there is no backend of our
+    // own). Only staff can queue one; the extension reads and stamps these
+    // documents with admin privileges, so it isn't subject to these rules.
+    match /mail/{mailId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
     }
 
     // App-wide config, reserved for future settings.
