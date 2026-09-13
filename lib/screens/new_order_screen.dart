@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/order.dart';
+import '../services/app_update_service.dart';
 import '../services/order_service.dart';
 import '../services/pricing_config.dart';
 import 'add_card_item_screen.dart';
@@ -131,6 +132,20 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   Future<void> _submit() async {
     if (_cartItems.isEmpty) return;
     setState(() => _error = null);
+
+    setState(() => _submitting = true);
+    final canSubmit = await AppUpdateService.instance.canSubmitOrders();
+    if (!mounted) return;
+    if (!canSubmit) {
+      setState(() {
+        _submitting = false;
+        _error =
+            'Es necesario actualizar la aplicación. Por favor actualiza o '
+            'limpia la caché.';
+      });
+      return;
+    }
+    setState(() => _submitting = false);
 
     final confirmed = await showDialog<bool>(
       context: context,
