@@ -232,7 +232,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                         if (item.setName.isNotEmpty) item.setName,
                         item.condition,
                         item.isReferencePrice
-                            ? 'Precio referencial'
+                            ? (item.sellerName?.isNotEmpty == true
+                                  ? '${item.sellerName} (referencial)'
+                                  : 'Precio referencial')
                             : (item.sellerName ?? ''),
                         if (item.shipping > 0)
                           '+ ${_currency.format(item.shipping)} envío',

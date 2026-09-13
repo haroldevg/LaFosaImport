@@ -78,7 +78,9 @@ class OrderSummaryCard extends StatelessWidget {
                               if (item.setName.isNotEmpty) item.setName,
                               item.condition,
                               item.isReferencePrice
-                                  ? 'Precio referencial'
+                                  ? (item.sellerName?.isNotEmpty == true
+                                        ? 'Vendedor: ${item.sellerName} (referencial)'
+                                        : 'Precio referencial')
                                   : 'Vendedor: ${item.sellerName ?? '—'}',
                               if (item.shipping > 0)
                                 '+ ${_currency.format(item.shipping)} envío',

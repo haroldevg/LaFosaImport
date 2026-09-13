@@ -21,9 +21,11 @@ const _conditions = [
 /// segmented toggle. In that mode the card name/set/condition fields are
 /// locked (they should come from the scrape, not be typed ahead of it) and
 /// only unlock individually if the scrape couldn't fill them; quantity is
-/// capped at the seller's stock. Manual entry is the fallback and — per
-/// design — never asks for a specific seller or caps quantity, just a rough
-/// reference price the staff will match when buying for real.
+/// capped at the seller's stock. Manual entry is the fallback (and the only
+/// option on web, where the scraper can't run) — seller and shipping are
+/// optional free-text/number fields instead of a picked listing, quantity
+/// isn't capped, and the price is always flagged as a reference the staff
+/// confirms when buying for real.
 class AddCardItemScreen extends StatefulWidget {
   const AddCardItemScreen({super.key});
 
@@ -37,6 +39,8 @@ class _AddCardItemScreenState extends State<AddCardItemScreen> {
   final _setNameCtrl = TextEditingController();
   final _listingUrlCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
+  final _sellerNameCtrl = TextEditingController();
+  final _shippingCtrl = TextEditingController();
   String _condition = _conditions.first;
   // The link-based scraper needs a native WebView, unavailable on web —
   // start in manual mode there instead of a search box that can never work.
@@ -52,9 +56,10 @@ class _AddCardItemScreenState extends State<AddCardItemScreen> {
   // While in link mode, these fields are locked until a search fills them —
   // and stay locked afterward unless the scrape came back empty for that
   // field, in which case it unlocks so the user can complete it by hand.
-  bool _cardNameLocked = true;
-  bool _setNameLocked = true;
-  bool _conditionLocked = true;
+  // Must match _useLink's initial value, or manual mode starts pre-locked.
+  bool _cardNameLocked = !kIsWeb;
+  bool _setNameLocked = !kIsWeb;
+  bool _conditionLocked = !kIsWeb;
 
   @override
   void dispose() {
@@ -62,6 +67,8 @@ class _AddCardItemScreenState extends State<AddCardItemScreen> {
     _setNameCtrl.dispose();
     _listingUrlCtrl.dispose();
     _priceCtrl.dispose();
+    _sellerNameCtrl.dispose();
+    _shippingCtrl.dispose();
     super.dispose();
   }
 
@@ -208,16 +215,27 @@ class _AddCardItemScreenState extends State<AddCardItemScreen> {
     final unitPrice = _useLink
         ? _pickedUnitPrice
         : double.parse(_priceCtrl.text.trim());
+    final shipping = _useLink
+        ? _pickedShipping
+        : (double.tryParse(_shippingCtrl.text.trim()) ?? 0);
+    final sellerName = _useLink
+        ? _pickedSeller
+        : (_sellerNameCtrl.text.trim().isEmpty
+              ? null
+              : _sellerNameCtrl.text.trim());
+    final listingUrl = _listingUrlCtrl.text.trim().isEmpty
+        ? null
+        : _listingUrlCtrl.text.trim();
     Navigator.of(context).pop(
       OrderItem(
         cardName: _cardNameCtrl.text.trim(),
         setName: _setNameCtrl.text.trim(),
         condition: _condition,
         unitPrice: unitPrice,
-        shipping: _useLink ? _pickedShipping : 0,
+        shipping: shipping,
         quantity: _quantity,
-        sellerName: _useLink ? _pickedSeller : null,
-        listingUrl: _useLink ? _listingUrlCtrl.text.trim() : null,
+        sellerName: sellerName,
+        listingUrl: listingUrl,
         isReferencePrice: !_useLink,
       ),
     );
@@ -264,18 +282,25 @@ class _AddCardItemScreenState extends State<AddCardItemScreen> {
                 onSelectionChanged: (s) => _setMode(s.first),
               ),
               const SizedBox(height: 16),
-              if (_useLink) ...[
-                TextFormField(
-                  controller: _listingUrlCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Link del listado en TCGPlayer',
-                    hintText: 'https://www.tcgplayer.com/product/...',
-                  ),
-                  keyboardType: TextInputType.url,
-                  onChanged: (_) => setState(_resetPickedSeller),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+              TextFormField(
+                controller: _listingUrlCtrl,
+                decoration: InputDecoration(
+                  labelText: _useLink
+                      ? 'Link del listado en TCGPlayer'
+                      : 'Link del listado (opcional)',
+                  hintText: 'https://www.tcgplayer.com/product/...',
                 ),
+                keyboardType: TextInputType.url,
+                onChanged: _useLink
+                    ? (_) => setState(_resetPickedSeller)
+                    : null,
+                validator: _useLink
+                    ? (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Requerido' : null
+                    : null,
+              ),
+              if (!_useLink) const SizedBox(height: 12),
+              if (_useLink) ...[
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -351,6 +376,13 @@ class _AddCardItemScreenState extends State<AddCardItemScreen> {
               if (!_useLink) ...[
                 const SizedBox(height: 12),
                 TextFormField(
+                  controller: _sellerNameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Vendedor (opcional)',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
                   controller: _priceCtrl,
                   decoration: const InputDecoration(
                     labelText: 'Precio referencial (USD)',
@@ -365,6 +397,23 @@ class _AddCardItemScreenState extends State<AddCardItemScreen> {
                     if (v == null || v.trim().isEmpty) return 'Requerido';
                     final parsed = double.tryParse(v.trim());
                     if (parsed == null || parsed <= 0) return 'Precio inválido';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _shippingCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Envío del vendedor (USD, opcional)',
+                    prefixText: '\$ ',
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return null;
+                    final parsed = double.tryParse(v.trim());
+                    if (parsed == null || parsed < 0) return 'Envío inválido';
                     return null;
                   },
                 ),
