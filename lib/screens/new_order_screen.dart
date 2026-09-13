@@ -1,11 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/order.dart';
 import '../services/order_service.dart';
 import '../services/pricing_config.dart';
-import '../services/us_sales_tax_rates.dart';
 import 'add_card_item_screen.dart';
 
 final _currency = NumberFormat.simpleCurrency(name: 'USD');
@@ -24,26 +23,19 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   final List<OrderItem> _cartItems = [];
   bool _submitting = false;
   String? _error;
-  String _forwarderState = 'FL';
-  double _taxRate = taxRateFor('FL');
+  bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
-    _loadTaxRate();
+    _loadAdminStatus();
   }
 
-  Future<void> _loadTaxRate() async {
-    final settingsDoc = await FirebaseFirestore.instance
-        .collection('config')
-        .doc('settings')
-        .get();
-    final state = settingsDoc.data()?['forwarderState'] as String? ?? 'FL';
+  Future<void> _loadAdminStatus() async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final isAdmin = await OrderService.instance.isAdmin(uid).first;
     if (!mounted) return;
-    setState(() {
-      _forwarderState = state;
-      _taxRate = taxRateFor(state);
-    });
+    setState(() => _isAdmin = isAdmin);
   }
 
   double get _cardsSubtotal => _cartItems.fold<double>(
@@ -57,24 +49,29 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   double get _subtotal =>
       double.parse((_cardsSubtotal + _shippingTotal).toStringAsFixed(2));
 
-  double get _tax => double.parse((_subtotal * _taxRate).toStringAsFixed(2));
+  double get _tax =>
+      double.parse((_subtotal * fixedTaxRate).toStringAsFixed(2));
 
   int get _totalQuantity =>
       _cartItems.fold<int>(0, (acc, item) => acc + item.quantity);
 
   /// Flat per-card fee for consolidating and forwarding to Peru — charged
   /// per unit (quantity), not per line item, and not subject to US sales tax.
-  double get _internationalShipping => double.parse(
-    (_totalQuantity * internationalShippingFeePerCard).toStringAsFixed(2),
-  );
+  /// Admins pay a reduced fee.
+  double get _shippingFeePerCard => internationalShippingFeeFor(_isAdmin);
+
+  double get _internationalShipping =>
+      double.parse((_totalQuantity * _shippingFeePerCard).toStringAsFixed(2));
 
   /// Tiered service margin (see [marginTiers]) — each card's own unit price
-  /// picks its bracket, not subject to US sales tax.
-  double get _margin => double.parse(
-    _cartItems
-        .fold<double>(0, (acc, item) => acc + marginAmountForItem(item))
-        .toStringAsFixed(2),
-  );
+  /// picks its bracket, not subject to US sales tax. Admins pay no margin.
+  double get _margin => _isAdmin
+      ? 0
+      : double.parse(
+          _cartItems
+              .fold<double>(0, (acc, item) => acc + marginAmountForItem(item))
+              .toStringAsFixed(2),
+        );
 
   double get _total => double.parse(
     (_subtotal + _tax + _margin + _internationalShipping).toStringAsFixed(2),
@@ -148,12 +145,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             _PriceRow('Cartas', _cardsSubtotal),
             if (_shippingTotal > 0) _PriceRow('Envío', _shippingTotal),
             _PriceRow(
-              'Tax estimado (${(_taxRate * 100).toStringAsFixed(2)}%, $_forwarderState)',
+              'Tax estimado (${(fixedTaxRate * 100).toStringAsFixed(0)}%)',
               _tax,
             ),
             _PriceRow('Margen de servicio', _margin),
             _PriceRow(
-              'Envío a Perú ($_totalQuantity carta(s) × \$0.50)',
+              'Envío a Perú ($_totalQuantity carta(s) × ${_currency.format(_shippingFeePerCard)})',
               _internationalShipping,
             ),
             const Divider(),
@@ -271,12 +268,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 _PriceRow('Cartas', _cardsSubtotal),
                 if (_shippingTotal > 0) _PriceRow('Envío', _shippingTotal),
                 _PriceRow(
-                  'Tax estimado (${(_taxRate * 100).toStringAsFixed(2)}%)',
+                  'Tax estimado (${(fixedTaxRate * 100).toStringAsFixed(0)}%)',
                   _tax,
                 ),
                 _PriceRow('Margen de servicio', _margin),
                 _PriceRow(
-                  'Envío a Perú ($_totalQuantity carta(s) × \$0.50)',
+                  'Envío a Perú ($_totalQuantity carta(s) × ${_currency.format(_shippingFeePerCard)})',
                   _internationalShipping,
                 ),
                 const Divider(height: 16),

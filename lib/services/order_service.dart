@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/order.dart';
 import 'pricing_config.dart';
-import 'us_sales_tax_rates.dart';
 
 /// Thrown by [OrderService.createOrder] when the user already has an order
 /// that isn't delivered/cancelled yet.
@@ -61,27 +60,29 @@ class OrderService {
   Future<void> createOrder({required List<OrderItem> items}) async {
     assert(items.isNotEmpty);
     final user = FirebaseAuth.instance.currentUser!;
-    final settingsSnap = await _db.collection('config').doc('settings').get();
-    final forwarderState =
-        settingsSnap.data()?['forwarderState'] as String? ?? 'FL';
-    final rate = taxRateFor(forwarderState);
+    final roleSnap = await _db.collection('roles').doc(user.uid).get();
+    final isAdminUser = roleSnap.data()?['isAdmin'] == true;
+    final rate = fixedTaxRate;
     final rawSubtotal = items.fold<double>(
       0,
       (acc, item) => acc + item.lineTotal,
     );
     final subtotal = double.parse(rawSubtotal.toStringAsFixed(2));
     final tax = double.parse((subtotal * rate).toStringAsFixed(2));
-    final margin = double.parse(
-      items
-          .fold<double>(0, (acc, item) => acc + marginAmountForItem(item))
-          .toStringAsFixed(2),
-    );
+    final margin = isAdminUser
+        ? 0.0
+        : double.parse(
+            items
+                .fold<double>(0, (acc, item) => acc + marginAmountForItem(item))
+                .toStringAsFixed(2),
+          );
     final totalQuantity = items.fold<int>(
       0,
       (acc, item) => acc + item.quantity,
     );
     final internationalShipping = double.parse(
-      (totalQuantity * internationalShippingFeePerCard).toStringAsFixed(2),
+      (totalQuantity * internationalShippingFeeFor(isAdminUser))
+          .toStringAsFixed(2),
     );
     final total = double.parse(
       (subtotal + tax + margin + internationalShipping).toStringAsFixed(2),

@@ -75,7 +75,7 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // App-wide config (e.g. forwarderState used for the tax estimate).
+    // App-wide config, reserved for future settings.
     match /config/{docId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
