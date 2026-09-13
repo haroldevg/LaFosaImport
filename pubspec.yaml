@@ -45,6 +45,9 @@ dependencies:
   path_provider: ^2.1.6
   share_plus: ^13.3.0
   package_info_plus: ^10.2.1
+  # Browser APIs for the web-only Excel download (see xlsx_saver_web.dart);
+  # path_provider/share_plus are the mobile half and have no web support.
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:

@@ -1,11 +1,8 @@
-import 'dart:io';
-
 import 'package:excel/excel.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../models/order.dart';
+import 'xlsx_saver.dart';
 
 /// The two .xlsx reports the staff works off, each handed to the OS share
 /// sheet so it can be saved or sent wherever is convenient (Drive, email,
@@ -209,14 +206,8 @@ class OrderExportService {
       throw StateError('No se pudo generar el archivo Excel.');
     }
 
-    final dir = await getTemporaryDirectory();
     final fileName =
         '${fileNamePrefix}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
-    final file = File('${dir.path}/$fileName');
-    await file.writeAsBytes(bytes, flush: true);
-
-    await SharePlus.instance.share(
-      ShareParams(files: [XFile(file.path)], subject: subject, text: text),
-    );
+    await saveXlsx(bytes, fileName: fileName, subject: subject, text: text);
   }
 }
