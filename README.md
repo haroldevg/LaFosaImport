@@ -26,9 +26,9 @@ reescribir los precios de un pedido ya enviado:
    envío a Perú se recalculan en vivo con la misma tabla de precios con la que
    se cotizó el pedido originalmente (los pedidos de un admin conservan su
    esquema sin margen y con envío reducido).
-2. Al guardar, el pedido pasa al estado **"Ajuste de precio — por confirmar"**
-   y se le envía un correo al cliente con el detalle, el total anterior, el
-   nuevo y la diferencia.
+2. Al guardar, el pedido pasa al estado **"Ajuste de precio — por confirmar"**.
+   No hay email ni notificación push — el cliente ve el aviso la próxima vez
+   que abre la app.
 3. El cliente entra a la app (pedido activo o historial, también disponible
    cuando la convocatoria está cerrada) y **acepta** el nuevo precio — el
    pedido pasa a **"Precio confirmado"** y recién ahí aparece en la exportación
@@ -47,32 +47,6 @@ El botón de descarga del panel ofrece dos Excel:
   *Por entregar* con una fila por pedido (cliente, correo, unidades y total a
   cobrar) y hoja *Detalle* con una fila por carta, agrupada por pedido y
   cerrada con el total de ese pedido, para ir tildando al armar la entrega.
-
-### Envío de correos (requiere una extensión de Firebase)
-
-No hay backend propio: la app encola el correo escribiendo un documento en la
-colección `mail`, que entrega la extensión
-[**Trigger Email from Firestore**](https://extensions.dev/extensions/firebase/firestore-send-email).
-Mientras la extensión no esté instalada, los documentos se acumulan sin
-enviarse (el ajuste de precio igual queda registrado y el cliente lo ve en la
-app).
-
-Instalación, una sola vez, en el proyecto `tcgimport-pe`:
-
-```bash
-firebase ext:install firebase/firestore-send-email --project=tcgimport-pe
-```
-
-Parámetros a usar durante la instalación:
-
-- **Email documents collection**: `mail` (debe coincidir con `MailService`).
-- **SMTP connection URI**: el SMTP del remitente, por ejemplo
-  `smtps://usuario@dominio.com@smtp.gmail.com:465` (con una contraseña de
-  aplicación, no la del correo).
-- **Default FROM address**: el remitente que verá el cliente.
-
-Si la app se publica en un dominio propio, actualizar `appUrl` en
-`lib/services/mail_service.dart` — es el enlace del botón del correo.
 
 Después de cambiar reglas, desplegarlas con:
 

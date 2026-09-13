@@ -107,15 +107,6 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Outbox for the "Trigger Email from Firestore" extension: dropping a
-    // document here is what actually sends a mail (there is no backend of our
-    // own). Only staff can queue one; the extension reads and stamps these
-    // documents with admin privileges, so it isn't subject to these rules.
-    match /mail/{mailId} {
-      allow read, create: if isAdmin();
-      allow update, delete: if false;
-    }
-
     // App-wide config, reserved for future settings.
     match /config/{docId} {
       allow read: if isSignedIn();

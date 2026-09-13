@@ -2,31 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/order.dart';
-import 'mail_service.dart';
 import 'pricing_config.dart';
 
 /// Thrown by [OrderService.createOrder] when the user already has an order
 /// that isn't delivered/cancelled yet.
 class ActiveOrderExistsException implements Exception {}
-
-/// Outcome of [OrderService.applyPriceAdjustment]. The order is already
-/// saved by the time this comes back; [emailError] is non-null only when the
-/// customer notification couldn't be queued, which is worth telling the staff
-/// about (so they can reach out another way) but never undoes the reprice —
-/// the customer still sees the request in the app.
-class PriceAdjustmentResult {
-  final OrderTotals totals;
-  final String? notifiedEmail;
-  final String? emailError;
-
-  const PriceAdjustmentResult({
-    required this.totals,
-    this.notifiedEmail,
-    this.emailError,
-  });
-
-  bool get emailQueued => emailError == null;
-}
 
 class OrderService {
   OrderService._();
@@ -126,8 +106,8 @@ class OrderService {
       tx.set(orderRef, {
         'userId': user.uid,
         'userDisplayName': user.displayName ?? user.email ?? '',
-        // Kept on the order itself so a later reprice can email the customer
-        // without having to go read their profile doc.
+        // Kept on the order itself for the "Comprados por entregar" export,
+        // without having to go read the profile doc for every order.
         'userEmail': user.email ?? '',
         // Which fee schedule this quote was built on, so a reprice months
         // later reapplies the same one even if the user's role changed.
@@ -154,8 +134,9 @@ class OrderService {
   /// buyable by the time the staff gets to it), recalculates every derived
   /// figure with the exact schedule the order was originally quoted on, and
   /// parks it in [OrderStatus.priceReview] so the customer has to approve the
-  /// new total before anyone buys it. The customer is emailed the difference.
-  Future<PriceAdjustmentResult> applyPriceAdjustment({
+  /// new total before anyone buys it — they see the request next time they
+  /// open the app (there's no email/push notification for it).
+  Future<OrderTotals> applyPriceAdjustment({
     required CardOrder order,
     required List<OrderItem> items,
     String? note,
@@ -167,6 +148,9 @@ class OrderService {
       adminPricing: order.usesAdminPricing,
     );
     final trimmedNote = note?.trim();
+    // Opportunistically backfills orders placed before `userEmail` existed —
+    // still useful for the "Comprados por entregar" export even without a
+    // notification email to send it to.
     final customerEmail = await _resolveCustomerEmail(order);
 
     await _db.collection('orders').doc(order.id).update({
@@ -197,47 +181,12 @@ class OrderService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
-    if (customerEmail == null || customerEmail.isEmpty) {
-      return PriceAdjustmentResult(
-        totals: totals,
-        emailError: 'el pedido no tiene un correo asociado',
-      );
-    }
-
-    // The order is already saved; a mail failure is reported, never rolled
-    // back — the customer still gets the same request inside the app.
-    try {
-      await MailService.instance.sendPriceAdjustmentNotice(
-        to: customerEmail,
-        order: order,
-        items: items,
-        totals: OrderTotalsSummary(
-          subtotal: totals.subtotal,
-          tax: totals.tax,
-          margin: totals.margin,
-          internationalShipping: totals.internationalShipping,
-          previousTotal: order.estimatedTotal,
-          newTotal: totals.total,
-        ),
-        note: trimmedNote,
-      );
-      return PriceAdjustmentResult(
-        totals: totals,
-        notifiedEmail: customerEmail,
-      );
-    } catch (e) {
-      return PriceAdjustmentResult(
-        totals: totals,
-        notifiedEmail: customerEmail,
-        emailError: '$e',
-      );
-    }
+    return totals;
   }
 
-  /// The email a price-adjustment notice should go to: the copy stored on the
-  /// order, falling back to the profile doc for orders placed before that
-  /// field existed. Never throws — a missing address is reported by
-  /// [applyPriceAdjustment] instead of blocking the reprice.
+  /// Best-effort email for an order, for reporting purposes only (e.g. the
+  /// "Comprados por entregar" export) — the copy stored on the order, falling
+  /// back to the profile doc for orders placed before that field existed.
   Future<String?> _resolveCustomerEmail(CardOrder order) async {
     if (order.userEmail.isNotEmpty) return order.userEmail;
     try {
