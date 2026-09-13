@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
 import '../theme.dart';
+import 'order_history_screen.dart';
 
 /// Shown to signed-in non-admin users instead of [HomeScreen] while
 /// `config/settings.closed` is true in Firestore — e.g. once a promotional
-/// intake period ends. Admins are never gated by this screen.
+/// intake period ends. Admins are never gated by this screen. Users can't
+/// start a new order from here, but can still view the ones they already
+/// placed via [OrderHistoryScreen].
 class AppClosedScreen extends StatelessWidget {
   const AppClosedScreen({super.key});
 
@@ -48,6 +51,14 @@ class AppClosedScreen extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 24),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const OrderHistoryScreen()),
+                ),
+                icon: const Icon(Icons.receipt_long),
+                label: const Text('Ver mis pedidos'),
+              ),
+              const SizedBox(height: 12),
               TextButton(
                 onPressed: () => AuthService.instance.signOut(),
                 child: const Text('Cerrar sesión'),
