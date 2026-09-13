@@ -18,8 +18,11 @@ class AdminOrdersScreen extends StatefulWidget {
 }
 
 class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
+  static const _pageSize = 100;
+
   bool _exporting = false;
   bool _togglingIntake = false;
+  int _limit = _pageSize;
 
   /// Opens or closes the convocatoria for every non-admin user. Closing is
   /// confirmed first: it takes effect live and drops everyone who isn't an
@@ -206,7 +209,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<CardOrder>>(
-      stream: OrderService.instance.allOrders(),
+      stream: OrderService.instance.allOrders(limit: _limit),
       builder: (context, snap) {
         final orders = snap.data ?? [];
         return Scaffold(
@@ -223,16 +226,22 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                     : const Icon(Icons.file_download_outlined),
                 tooltip: 'Exportar a Excel',
                 enabled: !_exporting,
+                // Both reports fetch every matching order directly, on
+                // demand — never from the (capped) list already on screen,
+                // so an old pending order that scrolled past the limit is
+                // never silently left off.
                 onSelected: (kind) => switch (kind) {
                   _ExportKind.pending => _runExport(
-                    () =>
-                        OrderExportService.instance.exportPendingOrders(orders),
+                    () async => OrderExportService.instance.exportPendingOrders(
+                      await OrderService.instance.ordersReadyToBuy(),
+                    ),
                     emptyMessage: 'No hay pedidos pendientes por exportar.',
                   ),
                   _ExportKind.purchased => _runExport(
-                    () => OrderExportService.instance.exportPurchasedOrders(
-                      orders,
-                    ),
+                    () async =>
+                        OrderExportService.instance.exportPurchasedOrders(
+                          await OrderService.instance.purchasedOrders(),
+                        ),
                     emptyMessage: 'No hay pedidos comprados por entregar.',
                   ),
                 },
@@ -268,8 +277,26 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                       ? const Center(child: Text('No hay pedidos todavía.'))
                       : ListView.builder(
                           padding: const EdgeInsets.only(top: 8, bottom: 16),
-                          itemCount: orders.length,
+                          // orders.length == _limit means there may be older
+                          // orders this page doesn't include yet — offer to
+                          // load another page rather than silently hiding them.
+                          itemCount:
+                              orders.length + (orders.length >= _limit ? 1 : 0),
                           itemBuilder: (context, i) {
+                            if (i == orders.length) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                child: Center(
+                                  child: TextButton(
+                                    onPressed: () =>
+                                        setState(() => _limit += _pageSize),
+                                    child: const Text('Cargar más'),
+                                  ),
+                                ),
+                              );
+                            }
                             final order = orders[i];
                             return OrderSummaryCard(
                               order: order,

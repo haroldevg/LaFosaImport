@@ -27,21 +27,62 @@ class OrderService {
     });
   }
 
-  Stream<List<CardOrder>> orderHistory(String uid) {
+  /// The [limit] most recent orders for this user — capped so a long-time
+  /// customer's history doesn't turn into an ever-growing live listener (and
+  /// its matching read cost) every time this screen opens. Raise [limit] to
+  /// page in more; see [OrderHistoryScreen]'s "Cargar más" button.
+  Stream<List<CardOrder>> orderHistory(String uid, {int limit = 30}) {
     return _db
         .collection('orders')
         .where('userId', isEqualTo: uid)
         .orderBy('createdAt', descending: true)
+        .limit(limit)
         .snapshots()
         .map((snap) => snap.docs.map(CardOrder.fromFirestore).toList());
   }
 
-  Stream<List<CardOrder>> allOrders() {
+  /// The [limit] most recent orders across every user — same capping reason
+  /// as [orderHistory], but for the admin panel, where the collection is the
+  /// whole business's history rather than one customer's. The Excel export
+  /// deliberately does **not** use this: it always queries every matching
+  /// order directly (see [ordersReadyToBuy] and [purchasedOrders]), so an old
+  /// order that scrolled past this limit is never silently left off a report.
+  Stream<List<CardOrder>> allOrders({int limit = 100}) {
     return _db
         .collection('orders')
         .orderBy('createdAt', descending: true)
+        .limit(limit)
         .snapshots()
         .map((snap) => snap.docs.map(CardOrder.fromFirestore).toList());
+  }
+
+  /// One-time, uncapped fetch of every order still on the shopping list (see
+  /// [OrderStatusX.isReadyToBuy]) — used by the "Pendientes por comprar"
+  /// export so it reflects the whole business, not just whatever page of
+  /// [allOrders] happens to be on screen.
+  Future<List<CardOrder>> ordersReadyToBuy() async {
+    final snap = await _db
+        .collection('orders')
+        .where(
+          'status',
+          whereIn: [
+            OrderStatus.pending.name,
+            OrderStatus.priceConfirmed.name,
+            OrderStatus.awaitingPayment.name,
+          ],
+        )
+        .get();
+    return snap.docs.map(CardOrder.fromFirestore).toList();
+  }
+
+  /// One-time, uncapped fetch of every bought order — used by the "Comprados
+  /// por entregar" export for the same reason as [ordersReadyToBuy].
+  Future<List<CardOrder>> purchasedOrders() async {
+    final snap = await _db
+        .collection('orders')
+        .where('status', isEqualTo: OrderStatus.ordered.name)
+        .get();
+    return snap.docs.map(CardOrder.fromFirestore).toList();
   }
 
   Stream<bool> isAdmin(String uid) {
