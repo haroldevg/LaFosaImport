@@ -3,9 +3,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
+import 'screens/app_closed_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
+import 'services/order_service.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -41,7 +43,46 @@ class AuthGate extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        return snap.data == null ? const LoginScreen() : const HomeScreen();
+        return snap.data == null
+            ? const LoginScreen()
+            : _AccessGate(uid: snap.data!.uid);
+      },
+    );
+  }
+}
+
+/// Sits between login and [HomeScreen]: admins always get the app; everyone
+/// else sees [AppClosedScreen] while `config/settings.closed` is true.
+class _AccessGate extends StatelessWidget {
+  const _AccessGate({required this.uid});
+
+  final String uid;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<bool>(
+      stream: OrderService.instance.isAdmin(uid),
+      builder: (context, adminSnap) {
+        if (adminSnap.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (adminSnap.data == true) return const HomeScreen();
+
+        return StreamBuilder<bool>(
+          stream: OrderService.instance.appClosed(),
+          builder: (context, closedSnap) {
+            if (closedSnap.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            return closedSnap.data == true
+                ? const AppClosedScreen()
+                : const HomeScreen();
+          },
+        );
       },
     );
   }

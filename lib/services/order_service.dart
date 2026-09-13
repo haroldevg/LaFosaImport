@@ -52,6 +52,17 @@ class OrderService {
         .map((doc) => doc.data()?['isAdmin'] == true);
   }
 
+  /// Whether the app is closed to non-admin users (set manually in Firestore
+  /// at `config/settings.closed`, e.g. once a promotional intake period
+  /// ends). Defaults to false when the field or document is absent.
+  Stream<bool> appClosed() {
+    return _db
+        .collection('config')
+        .doc('settings')
+        .snapshots()
+        .map((doc) => doc.data()?['closed'] == true);
+  }
+
   /// Creates a new order request (a cart of one or more [items]) in a single
   /// atomic transaction: it fails with [ActiveOrderExistsException] if the
   /// user already has one active. Firestore's own transaction
