@@ -1,3 +1,5 @@
+import 'dart:ui' show lerpDouble;
+
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
@@ -27,27 +29,7 @@ class AppClosedScreen extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 148,
-                      height: 148,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: brand.violet.withValues(alpha: 0.45),
-                            blurRadius: 40,
-                            spreadRadius: 4,
-                          ),
-                        ],
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            Icon(Icons.style, size: 72, color: brand.violet),
-                      ),
-                    ),
+                    _PulsingLogoGlow(brand: brand),
                     const SizedBox(height: 24),
                     Text(
                       'Gracias por participar de la convocatoria.\n'
@@ -77,6 +59,66 @@ class AppClosedScreen extends StatelessWidget {
           ),
           const Positioned(bottom: 8, right: 12, child: AppVersionBadge()),
         ],
+      ),
+    );
+  }
+}
+
+/// The logo's violet glow, breathing in and out on a loop — draws the eye to
+/// the one thing on this screen without anything to click, instead of the
+/// static glow every other screen already uses.
+class _PulsingLogoGlow extends StatefulWidget {
+  const _PulsingLogoGlow({required this.brand});
+
+  final LaFosaColors brand;
+
+  @override
+  State<_PulsingLogoGlow> createState() => _PulsingLogoGlowState();
+}
+
+class _PulsingLogoGlowState extends State<_PulsingLogoGlow>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = Curves.easeInOut.transform(_controller.value);
+        return Container(
+          width: 148,
+          height: 148,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: widget.brand.violet.withValues(
+                  alpha: lerpDouble(0.35, 0.7, t)!,
+                ),
+                blurRadius: lerpDouble(32, 62, t)!,
+                spreadRadius: lerpDouble(2, 10, t)!,
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: child,
+        );
+      },
+      child: Image.asset(
+        'assets/images/logo.png',
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) =>
+            Icon(Icons.style, size: 72, color: widget.brand.violet),
       ),
     );
   }
