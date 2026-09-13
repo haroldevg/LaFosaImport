@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -37,7 +38,9 @@ class _AddCardItemScreenState extends State<AddCardItemScreen> {
   final _listingUrlCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
   String _condition = _conditions.first;
-  bool _useLink = true;
+  // The link-based scraper needs a native WebView, unavailable on web —
+  // start in manual mode there instead of a search box that can never work.
+  bool _useLink = !kIsWeb;
   bool _searchingListings = false;
   String? _pickedSeller;
   double _pickedUnitPrice = 0;
@@ -63,6 +66,10 @@ class _AddCardItemScreenState extends State<AddCardItemScreen> {
   }
 
   void _setMode(bool useLink) {
+    if (useLink && kIsWeb) {
+      setState(() => _error = 'No disponible para versión web.');
+      return;
+    }
     setState(() {
       _useLink = useLink;
       _error = null;
