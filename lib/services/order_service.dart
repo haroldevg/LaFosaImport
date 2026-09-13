@@ -91,11 +91,17 @@ class OrderService {
     final userRef = _db.collection('users').doc(user.uid);
     final orderRef = _db.collection('orders').doc();
 
-    await _db.runTransaction((tx) async {
+    // Returning a sentinel (rather than throwing inside the transaction
+    // callback) and throwing afterwards, in plain Dart, avoids a
+    // cloud_firestore_web bug where an exception thrown inside a transaction
+    // loses its type crossing the JS interop boundary — the caller then only
+    // sees a generic "Dart exception thrown from converted Future" instead
+    // of being able to catch ActiveOrderExistsException.
+    final hasActiveOrder = await _db.runTransaction<bool>((tx) async {
       final userSnap = await tx.get(userRef);
       final currentActiveId = userSnap.data()?['activeOrderId'] as String?;
       if (currentActiveId != null && currentActiveId.isNotEmpty) {
-        throw ActiveOrderExistsException();
+        return true;
       }
 
       tx.set(orderRef, {
@@ -113,7 +119,9 @@ class OrderService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
       tx.update(userRef, {'activeOrderId': orderRef.id});
+      return false;
     });
+    if (hasActiveOrder) throw ActiveOrderExistsException();
   }
 
   /// Admin-only: changes an order's status. Firestore rules enforce the
