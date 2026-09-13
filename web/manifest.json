@@ -1,11 +1,11 @@
 {
-    "name": "tcgimport",
-    "short_name": "tcgimport",
+    "name": "La Fosa Store",
+    "short_name": "La Fosa Store",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0A0A0D",
+    "theme_color": "#0A0A0D",
+    "description": "Solicita tus cartas de TCGPlayer para importar a Perú.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
