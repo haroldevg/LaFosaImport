@@ -9,8 +9,13 @@ import 'admin/admin_orders_screen.dart';
 import 'new_order_screen.dart';
 import 'order_history_screen.dart';
 
+/// [isAdmin] is resolved once by the caller (see `_AccessGate` in main.dart)
+/// rather than re-queried here — this screen used to run its own separate
+/// `isAdmin` listener for the same value the access gate already has.
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, required this.isAdmin});
+
+  final bool isAdmin;
 
   @override
   Widget build(BuildContext context) {
@@ -30,19 +35,14 @@ class HomeScreen extends StatelessWidget {
         ),
         title: const Text('La Fosa Store'),
         actions: [
-          StreamBuilder<bool>(
-            stream: OrderService.instance.isAdmin(uid),
-            builder: (context, snap) {
-              if (snap.data != true) return const SizedBox.shrink();
-              return IconButton(
-                icon: const Icon(Icons.admin_panel_settings),
-                tooltip: 'Panel admin',
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AdminOrdersScreen()),
-                ),
-              );
-            },
-          ),
+          if (isAdmin)
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings),
+              tooltip: 'Panel admin',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AdminOrdersScreen()),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.history),
             tooltip: 'Historial',
@@ -82,7 +82,8 @@ class HomeScreen extends StatelessWidget {
                               label: const Text('Nuevo pedido'),
                               onPressed: () => Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => const NewOrderScreen(),
+                                  builder: (_) =>
+                                      NewOrderScreen(isAdmin: isAdmin),
                                 ),
                               ),
                             ),

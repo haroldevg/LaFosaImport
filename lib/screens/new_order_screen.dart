@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -12,9 +11,14 @@ final _currency = NumberFormat.simpleCurrency(name: 'USD');
 
 /// The "new order" flow: a shopping-cart-style screen where the user adds
 /// one or more cards (via [AddCardItemScreen]) before sending the whole
-/// cart as a single order request.
+/// cart as a single order request. [isAdmin] is resolved once by the caller
+/// (see `_AccessGate` in main.dart) rather than re-queried here, since every
+/// screen asking the same tiny doc independently was three listeners for one
+/// value.
 class NewOrderScreen extends StatefulWidget {
-  const NewOrderScreen({super.key});
+  const NewOrderScreen({super.key, required this.isAdmin});
+
+  final bool isAdmin;
 
   @override
   State<NewOrderScreen> createState() => _NewOrderScreenState();
@@ -24,20 +28,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   final List<OrderItem> _cartItems = [];
   bool _submitting = false;
   String? _error;
-  bool _isAdmin = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAdminStatus();
-  }
-
-  Future<void> _loadAdminStatus() async {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    final isAdmin = await OrderService.instance.isAdmin(uid).first;
-    if (!mounted) return;
-    setState(() => _isAdmin = isAdmin);
-  }
 
   double get _cardsSubtotal => _cartItems.fold<double>(
     0,
@@ -59,14 +49,14 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   /// Flat per-card fee for consolidating and forwarding to Peru — charged
   /// per unit (quantity), not per line item, and not subject to US sales tax.
   /// Admins pay a reduced fee.
-  double get _shippingFeePerCard => internationalShippingFeeFor(_isAdmin);
+  double get _shippingFeePerCard => internationalShippingFeeFor(widget.isAdmin);
 
   double get _internationalShipping =>
       double.parse((_totalQuantity * _shippingFeePerCard).toStringAsFixed(2));
 
   /// Tiered service margin (see [marginTiers]) — each card's own unit price
   /// picks its bracket, not subject to US sales tax. Admins pay no margin.
-  double get _margin => _isAdmin
+  double get _margin => widget.isAdmin
       ? 0
       : double.parse(
           _cartItems

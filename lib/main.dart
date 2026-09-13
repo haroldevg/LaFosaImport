@@ -68,7 +68,9 @@ class _AccessGate extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        if (adminSnap.data == true) return const HomeScreen();
+        if (adminSnap.data == true) {
+          return const HomeScreen(isAdmin: true);
+        }
 
         return StreamBuilder<bool>(
           stream: OrderService.instance.appClosed(),
@@ -80,7 +82,7 @@ class _AccessGate extends StatelessWidget {
             }
             return closedSnap.data == true
                 ? const AppClosedScreen()
-                : const HomeScreen();
+                : const HomeScreen(isAdmin: false);
           },
         );
       },
