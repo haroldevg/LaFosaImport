@@ -180,11 +180,10 @@ class _AdjustmentSummary extends StatelessWidget {
             '(${wentUp ? '+' : '−'}${_currency.format(adjustment.difference.abs())})',
             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
           ),
-          if (adjustment.adjustedByName?.isNotEmpty == true)
-            Text(
-              'Por: ${adjustment.adjustedByName}',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
+          const Text(
+            'Por: $staffDisplayName',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
           if (adjustment.note?.isNotEmpty == true)
             Text(
               'Nota: ${adjustment.note}',

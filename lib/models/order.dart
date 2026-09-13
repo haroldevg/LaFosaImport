@@ -108,13 +108,21 @@ class OrderItem {
   }
 }
 
+/// How a reprice is signed towards the customer. Deliberately a brand name
+/// and not the admin who made the change: the customer can read their own
+/// order document, so hiding a personal name only in the UI wouldn't actually
+/// hide it — it has to never be written in the first place.
+const staffDisplayName = 'Staff de La Fosa Store';
+
 /// Trace of the last staff reprice on an order: what the customer had been
 /// quoted, what they are being asked to approve now, and how they answered.
+/// Who signs it is always [staffDisplayName], so it isn't parsed from the
+/// document — orders repriced before this rule still carry a personal name in
+/// Firestore, and reading it back would put it on screen again.
 class PriceAdjustment {
   final double previousTotal;
   final double newTotal;
   final String? note;
-  final String? adjustedByName;
   final DateTime? adjustedAt;
   final DateTime? respondedAt;
 
@@ -125,7 +133,6 @@ class PriceAdjustment {
     required this.previousTotal,
     required this.newTotal,
     this.note,
-    this.adjustedByName,
     this.adjustedAt,
     this.respondedAt,
     this.accepted,
@@ -141,7 +148,6 @@ class PriceAdjustment {
       previousTotal: (map['previousTotal'] as num?)?.toDouble() ?? 0,
       newTotal: (map['newTotal'] as num?)?.toDouble() ?? 0,
       note: map['note'] as String?,
-      adjustedByName: map['adjustedByName'] as String?,
       adjustedAt: (map['adjustedAt'] as Timestamp?)?.toDate(),
       respondedAt: (map['respondedAt'] as Timestamp?)?.toDate(),
       accepted: map['accepted'] as bool?,

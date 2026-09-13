@@ -142,7 +142,6 @@ class OrderService {
     String? note,
   }) async {
     assert(items.isNotEmpty);
-    final admin = FirebaseAuth.instance.currentUser!;
     final totals = OrderTotals.forItems(
       items,
       adminPricing: order.usesAdminPricing,
@@ -170,7 +169,9 @@ class OrderService {
         'note': (trimmedNote == null || trimmedNote.isEmpty)
             ? null
             : trimmedNote,
-        'adjustedByName': admin.displayName ?? admin.email ?? '',
+        // The brand, never the admin who made the change: the customer can
+        // read this document, so their copy must not carry a personal name.
+        'adjustedByName': staffDisplayName,
         // Client clock rather than a server sentinel: this one is nested in a
         // map and only ever displayed, so it isn't worth relying on sentinel
         // support inside nested writes across the native/web SDKs.
