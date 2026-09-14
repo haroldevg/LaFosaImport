@@ -5,9 +5,11 @@ import '../services/auth_service.dart';
 import '../services/order_service.dart';
 import '../widgets/app_version_badge.dart';
 import '../widgets/order_summary_card.dart';
+import '../widgets/whatsapp_reminder_banner.dart';
 import 'admin/admin_orders_screen.dart';
 import 'new_order_screen.dart';
 import 'order_history_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -44,6 +46,13 @@ class HomeScreen extends StatelessWidget {
             },
           ),
           IconButton(
+            icon: const Icon(Icons.person_outline),
+            tooltip: 'Mi perfil',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.history),
             tooltip: 'Historial',
             onPressed: () => Navigator.of(context).push(
@@ -61,57 +70,67 @@ class HomeScreen extends StatelessWidget {
         child: Stack(
           children: [
             Positioned.fill(
-              child: StreamBuilder<CardOrder?>(
-                stream: OrderService.instance.activeOrder(uid),
-                builder: (context, snap) {
-                  if (snap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final activeOrder = snap.data;
-                  if (activeOrder == null) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+              child: Column(
+                children: [
+                  const WhatsappReminderBanner(),
+                  Expanded(
+                    child: StreamBuilder<CardOrder?>(
+                      stream: OrderService.instance.activeOrder(uid),
+                      builder: (context, snap) {
+                        if (snap.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        final activeOrder = snap.data;
+                        if (activeOrder == null) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('No tienes ningún pedido activo.'),
+                                  const SizedBox(height: 16),
+                                  FilledButton.icon(
+                                    icon: const Icon(Icons.add),
+                                    label: const Text('Nuevo pedido'),
+                                    onPressed: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const NewOrderScreen(),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                        return ListView(
+                          padding: const EdgeInsets.only(top: 16),
                           children: [
-                            const Text('No tienes ningún pedido activo.'),
-                            const SizedBox(height: 16),
-                            FilledButton.icon(
-                              icon: const Icon(Icons.add),
-                              label: const Text('Nuevo pedido'),
-                              onPressed: () => Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const NewOrderScreen(),
-                                ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16),
+                              child: Text(
+                                'Tu pedido activo:',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            OrderSummaryCard(order: activeOrder),
+                            const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text(
+                                'No puedes crear un nuevo pedido hasta que este '
+                                'sea entregado.',
+                                style: TextStyle(color: Colors.grey),
                               ),
                             ),
                           ],
-                        ),
-                      ),
-                    );
-                  }
-                  return ListView(
-                    padding: const EdgeInsets.only(top: 16),
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'Tu pedido activo:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      OrderSummaryCard(order: activeOrder),
-                      const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text(
-                          'No puedes crear un nuevo pedido hasta que este sea entregado.',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
             const Positioned(bottom: 8, right: 12, child: AppVersionBadge()),

@@ -160,6 +160,11 @@ class CardOrder {
   final String userId;
   final String userDisplayName;
   final String userEmail;
+
+  /// The customer's WhatsApp (`+51XXXXXXXXX`), copied from their profile when
+  /// the order was placed — it's how the staff coordinates payment and
+  /// delivery. Empty on orders placed before it was required.
+  final String userWhatsapp;
   final List<OrderItem> items;
   final double estimatedTaxRate;
   final double estimatedSubtotal;
@@ -183,6 +188,7 @@ class CardOrder {
     required this.userId,
     required this.userDisplayName,
     this.userEmail = '',
+    this.userWhatsapp = '',
     required this.items,
     required this.estimatedTaxRate,
     required this.estimatedSubtotal,
@@ -217,6 +223,7 @@ class CardOrder {
       userId: data['userId'] as String? ?? '',
       userDisplayName: data['userDisplayName'] as String? ?? '',
       userEmail: data['userEmail'] as String? ?? '',
+      userWhatsapp: data['userWhatsapp'] as String? ?? '',
       items: rawItems
           .map((e) => OrderItem.fromMap(Map<String, dynamic>.from(e as Map)))
           .toList(),

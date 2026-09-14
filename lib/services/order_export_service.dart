@@ -32,6 +32,7 @@ class OrderExportService {
   static const _deliverySummaryHeaders = [
     'Cliente',
     'Correo',
+    'WhatsApp',
     'Fecha pedido',
     'Comprado el',
     'Unidades',
@@ -129,6 +130,7 @@ class OrderExportService {
       summary.appendRow([
         TextCellValue(order.userDisplayName),
         TextCellValue(order.userEmail),
+        TextCellValue(order.userWhatsapp),
         TextCellValue(
           order.createdAt != null ? _dateFmt.format(order.createdAt!) : '',
         ),

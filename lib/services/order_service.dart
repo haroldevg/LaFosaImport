@@ -3,10 +3,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/order.dart';
 import 'pricing_config.dart';
+import 'profile_service.dart';
 
 /// Thrown by [OrderService.createOrder] when the user already has an order
 /// that isn't delivered/cancelled yet.
 class ActiveOrderExistsException implements Exception {}
+
+/// Thrown by [OrderService.createOrder] when the user hasn't registered a
+/// WhatsApp number yet — the staff coordinates payment and delivery over
+/// WhatsApp, so an order without one can't be followed up.
+class MissingWhatsAppException implements Exception {}
 
 class OrderService {
   OrderService._();
@@ -88,6 +94,18 @@ class OrderService {
     final totals = OrderTotals.forItems(items, adminPricing: isAdminUser);
 
     final userRef = _db.collection('users').doc(user.uid);
+
+    // The profile is the source of truth for how the customer is reached: the
+    // name they chose (not necessarily Google's) and the WhatsApp the staff
+    // needs to coordinate payment and delivery. Both are copied onto the
+    // order so the delivery report doesn't have to chase profile documents.
+    final profile = await ProfileService.instance.fetchProfile(user.uid);
+    if (profile == null || !profile.hasWhatsapp) {
+      throw MissingWhatsAppException();
+    }
+    final displayName = profile.displayName.isNotEmpty
+        ? profile.displayName
+        : (user.displayName ?? user.email ?? '');
     final orderRef = _db.collection('orders').doc();
 
     // Returning a sentinel (rather than throwing inside the transaction
@@ -105,10 +123,11 @@ class OrderService {
 
       tx.set(orderRef, {
         'userId': user.uid,
-        'userDisplayName': user.displayName ?? user.email ?? '',
+        'userDisplayName': displayName,
         // Kept on the order itself for the "Comprados por entregar" export,
         // without having to go read the profile doc for every order.
         'userEmail': user.email ?? '',
+        'userWhatsapp': profile.whatsapp,
         // Which fee schedule this quote was built on, so a reprice months
         // later reapplies the same one even if the user's role changed.
         'ownerIsAdmin': isAdminUser,

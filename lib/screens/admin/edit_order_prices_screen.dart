@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../models/order.dart';
 import '../../services/order_service.dart';
 import '../../services/pricing_config.dart';
+import '../../widgets/customer_contact.dart';
 
 final _currency = NumberFormat.simpleCurrency(name: 'USD');
 
@@ -163,6 +164,10 @@ class _EditOrderPricesScreenState extends State<EditOrderPricesScreen> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 4),
+              // Same tap-to-chat link as the panel list: a reprice is exactly
+              // when the staff may need to ask the customer something.
+              CustomerContact(order: widget.order),
+              const SizedBox(height: 8),
               const Text(
                 'Actualiza el precio de cada carta con lo que realmente cuesta '
                 'ahora en TCGPlayer. Los cálculos se rehacen solos y el cliente '

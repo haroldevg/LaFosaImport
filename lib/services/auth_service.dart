@@ -70,8 +70,14 @@ class AuthService {
 
   Future<void> _syncUserProfile(User? user) async {
     if (user == null) return;
-    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-      'displayName': user.displayName,
+    final ref = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    final snap = await ref.get();
+    final hasOwnName = (snap.data()?['displayName'] as String?)?.isNotEmpty
+        ?? false;
+    await ref.set({
+      // Google's name only seeds the profile: the profile screen lets people
+      // rename themselves, and signing in again must not undo that.
+      if (!hasOwnName) 'displayName': user.displayName,
       'email': user.email,
       'photoUrl': user.photoURL,
     }, SetOptions(merge: true));

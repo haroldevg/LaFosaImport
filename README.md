@@ -16,6 +16,28 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
+## Perfil del cliente
+
+Cada usuario tiene una pantalla **Mi perfil** (ícono de persona en la barra
+superior) donde edita su **nombre** y su **WhatsApp**. El correo se muestra
+pero no es editable: viene de la cuenta de Google con la que inicia sesión.
+
+El número es solo de Perú: el campo muestra `+51` fijo y el usuario escribe los
+9 dígitos (debe empezar con 9). Se guarda normalizado como `+51XXXXXXXXX` en
+`users/{uid}.whatsapp`; si alguien pega el número con `+51` o `51` adelante, se
+recorta solo.
+
+**Sin WhatsApp registrado no se puede enviar un pedido.** El bloqueo está en
+`OrderService.createOrder` (lanza `MissingWhatsAppException` antes de tocar la
+base), y la app lo acompaña por dos lados: un aviso rojo en la pantalla
+principal mientras falte el número, y un diálogo al intentar enviar el pedido
+que lleva al perfil sin perder el carrito.
+
+El nombre y el WhatsApp se copian al pedido en el momento de crearlo, así que
+aparecen en el panel admin y en el reporte "Comprados por entregar" sin tener
+que ir a buscar el perfil. Como es una foto del momento, un pedido viejo
+conserva el número con el que se hizo.
+
 ## Ajuste de precios de un pedido
 
 Los precios de TCGPlayer cambian constantemente, así que el staff puede

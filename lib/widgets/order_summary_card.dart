@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../models/order.dart';
 import '../services/auth_service.dart';
+import 'customer_contact.dart';
 import 'price_adjustment_actions.dart';
 
 final _currency = NumberFormat.simpleCurrency(name: 'USD');
@@ -66,11 +67,10 @@ class OrderSummaryCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (showRequester)
-              Text(
-                'Pedido por: ${order.userDisplayName}',
-                style: const TextStyle(fontStyle: FontStyle.italic),
-              ),
+            if (showRequester) ...[
+              const SizedBox(height: 4),
+              CustomerContact(order: order),
+            ],
             const Divider(),
             for (final item in order.items)
               Padding(

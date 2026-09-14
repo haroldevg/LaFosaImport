@@ -7,6 +7,7 @@ import '../services/app_update_service.dart';
 import '../services/order_service.dart';
 import '../services/pricing_config.dart';
 import 'add_card_item_screen.dart';
+import 'profile_screen.dart';
 
 final _currency = NumberFormat.simpleCurrency(name: 'USD');
 
@@ -201,11 +202,51 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         () =>
             _error = 'Ya tienes un pedido activo. Espera a que sea entregado.',
       );
+    } on MissingWhatsAppException {
+      setState(
+        () => _error =
+            'Registra tu número de WhatsApp para poder enviar el pedido.',
+      );
+      await _promptForWhatsapp();
     } catch (e) {
       setState(() => _error = 'Error inesperado: $e');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  /// Offers to go fill in the missing WhatsApp number. The cart is left
+  /// untouched, so coming back from the profile is one tap away from sending
+  /// the same order.
+  Future<void> _promptForWhatsapp() async {
+    if (!mounted) return;
+    final goToProfile = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Falta tu WhatsApp'),
+        content: const Text(
+          'Necesitamos tu número para coordinar el pago y la entrega del '
+          'pedido. Regístralo en tu perfil y vuelve a enviarlo — tu carrito '
+          'se mantiene.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Ahora no'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Completar perfil'),
+          ),
+        ],
+      ),
+    );
+    if (goToProfile != true || !mounted) return;
+
+    final saved = await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute(builder: (_) => const ProfileScreen()));
+    if (saved == true && mounted) setState(() => _error = null);
   }
 
   @override
