@@ -272,6 +272,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 return _CartItemCard(
                   item: _cartItems[i],
                   brand: brand,
+                  isAdmin: widget.isAdmin,
                   onRemove: () => setState(() => _cartItems.removeAt(i)),
                 );
               },
@@ -293,21 +294,80 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _PriceRow('Cartas', _cardsSubtotal),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.receipt_long_outlined,
+                              size: 18,
+                              color: brand.violet,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Resumen del pedido',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _PriceRow(
+                          'Cartas',
+                          _cardsSubtotal,
+                          icon: Icons.style_outlined,
+                        ),
                         if (_shippingTotal > 0)
-                          _PriceRow('Envío', _shippingTotal),
+                          _PriceRow(
+                            'Envío del vendedor',
+                            _shippingTotal,
+                            icon: Icons.local_shipping_outlined,
+                          ),
                         _PriceRow(
                           'Tax estimado (${(fixedTaxRate * 100).toStringAsFixed(0)}%)',
                           _tax,
+                          icon: Icons.percent,
                         ),
-                        _PriceRow('Margen de servicio', _margin),
+                        _PriceRow(
+                          'Margen de servicio',
+                          _margin,
+                          icon: Icons.storefront_outlined,
+                        ),
                         _PriceRow(
                           'Envío a Perú ($_totalQuantity carta(s) × ${_currency.format(_shippingFeePerCard)})',
                           _internationalShipping,
+                          icon: Icons.flight_takeoff_outlined,
                         ),
-                        const Divider(height: 16),
-                        _PriceRow('Total estimado', _total, bold: true),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: brand.violet.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Total estimado',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                _currency.format(_total),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: brand.violet,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -391,11 +451,13 @@ class _CartItemCard extends StatelessWidget {
   const _CartItemCard({
     required this.item,
     required this.brand,
+    required this.isAdmin,
     required this.onRemove,
   });
 
   final OrderItem item;
   final LaFosaColors brand;
+  final bool isAdmin;
   final VoidCallback onRemove;
 
   @override
@@ -411,6 +473,26 @@ class _CartItemCard extends StatelessWidget {
         : (item.sellerName?.isNotEmpty == true
               ? item.sellerName!
               : 'Vendedor confirmado');
+
+    // The line's own price + seller shipping, plus this card's share of the
+    // cart-level fees — every one of these is a simple per-item slice of how
+    // the bottom summary computes the same totals, so they always add up to
+    // exactly what the cart shows overall.
+    final lineSubtotal = item.lineTotal;
+    final itemTax = double.parse(
+      (lineSubtotal * fixedTaxRate).toStringAsFixed(2),
+    );
+    final itemMargin = isAdmin
+        ? 0.0
+        : double.parse(marginAmountForItem(item).toStringAsFixed(2));
+    final itemPeruShipping = double.parse(
+      (item.quantity * internationalShippingFeeFor(isAdmin)).toStringAsFixed(2),
+    );
+    final itemGrandTotal = double.parse(
+      (lineSubtotal + itemTax + itemMargin + itemPeruShipping).toStringAsFixed(
+        2,
+      ),
+    );
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -462,7 +544,7 @@ class _CartItemCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      _currency.format(item.lineTotal),
+                      _currency.format(itemGrandTotal),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     IconButton(
@@ -490,11 +572,34 @@ class _CartItemCard extends StatelessWidget {
                   label: statusLabel,
                   color: statusColor,
                 ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // What gets added on top of the seller's own price to reach the
+            // total above — mirrors the bottom summary's rows, one line at a
+            // time, so it's clear why the total is more than "precio × qty".
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
                 if (item.shipping > 0)
                   _DetailChip(
                     icon: Icons.local_shipping_outlined,
-                    label: '+ ${_currency.format(item.shipping)} envío',
+                    label: 'Envío vendedor +${_currency.format(item.shipping)}',
                   ),
+                _DetailChip(
+                  icon: Icons.percent,
+                  label: 'Tax +${_currency.format(itemTax)}',
+                ),
+                if (itemMargin > 0)
+                  _DetailChip(
+                    icon: Icons.storefront_outlined,
+                    label: 'Margen +${_currency.format(itemMargin)}',
+                  ),
+                _DetailChip(
+                  icon: Icons.flight_takeoff_outlined,
+                  label: 'Envío Perú +${_currency.format(itemPeruShipping)}',
+                ),
               ],
             ),
           ],
@@ -561,8 +666,9 @@ class _PriceRow extends StatelessWidget {
   final String label;
   final double amount;
   final bool bold;
+  final IconData? icon;
 
-  const _PriceRow(this.label, this.amount, {this.bold = false});
+  const _PriceRow(this.label, this.amount, {this.bold = false, this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -570,11 +676,27 @@ class _PriceRow extends StatelessWidget {
         ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
         : null;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: style),
+          Expanded(
+            child: Row(
+              children: [
+                if (icon != null) ...[
+                  Icon(
+                    icon,
+                    size: 15,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Expanded(child: Text(label, style: style)),
+              ],
+            ),
+          ),
           Text(_currency.format(amount), style: style),
         ],
       ),
