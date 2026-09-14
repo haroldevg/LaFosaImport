@@ -269,47 +269,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               padding: const EdgeInsets.only(bottom: 16),
               itemCount: _cartItems.length,
               itemBuilder: (context, i) {
-                final item = _cartItems[i];
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  child: ListTile(
-                    leading: Icon(
-                      item.isReferencePrice
-                          ? Icons.help_outline
-                          : Icons.verified_outlined,
-                      color: item.isReferencePrice
-                          ? Colors.amber
-                          : brand.violet,
-                    ),
-                    title: Text('${item.cardName}  ×${item.quantity}'),
-                    subtitle: Text(
-                      [
-                        if (item.setName.isNotEmpty) item.setName,
-                        item.condition,
-                        item.isReferencePrice
-                            ? (item.sellerName?.isNotEmpty == true
-                                  ? '${item.sellerName} (referencial)'
-                                  : 'Precio referencial')
-                            : (item.sellerName ?? ''),
-                        if (item.shipping > 0)
-                          '+ ${_currency.format(item.shipping)} envío',
-                      ].where((s) => s.isNotEmpty).join(' · '),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(_currency.format(item.lineTotal)),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () =>
-                              setState(() => _cartItems.removeAt(i)),
-                        ),
-                      ],
-                    ),
-                  ),
+                return _CartItemCard(
+                  item: _cartItems[i],
+                  brand: brand,
+                  onRemove: () => setState(() => _cartItems.removeAt(i)),
                 );
               },
             ),
@@ -415,6 +378,161 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A cart line: card name/set up top with the price and a remove button,
+/// then a row of small chips for the details (quantity, condition, seller or
+/// reference status, shipping) instead of one run-on sentence — easier to
+/// scan than the plain `ListTile` this replaced.
+class _CartItemCard extends StatelessWidget {
+  const _CartItemCard({
+    required this.item,
+    required this.brand,
+    required this.onRemove,
+  });
+
+  final OrderItem item;
+  final LaFosaColors brand;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = item.isReferencePrice ? Colors.amber : brand.violet;
+    final statusIcon = item.isReferencePrice
+        ? Icons.help_outline
+        : Icons.verified_outlined;
+    final statusLabel = item.isReferencePrice
+        ? (item.sellerName?.isNotEmpty == true
+              ? '${item.sellerName} (referencial)'
+              : 'Precio referencial')
+        : (item.sellerName?.isNotEmpty == true
+              ? item.sellerName!
+              : 'Vendedor confirmado');
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: statusColor.withValues(alpha: 0.15),
+                  ),
+                  child: Icon(statusIcon, size: 20, color: statusColor),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.cardName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      if (item.setName.isNotEmpty)
+                        Text(
+                          item.setName,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      _currency.format(item.lineTotal),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 20),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: onRemove,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Divider(height: 1, color: Theme.of(context).dividerColor),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _DetailChip(icon: Icons.style_outlined, label: item.condition),
+                _DetailChip(icon: Icons.numbers, label: '×${item.quantity}'),
+                _DetailChip(
+                  icon: statusIcon,
+                  label: statusLabel,
+                  color: statusColor,
+                ),
+                if (item.shipping > 0)
+                  _DetailChip(
+                    icon: Icons.local_shipping_outlined,
+                    label: '+ ${_currency.format(item.shipping)} envío',
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Small pill used inside [_CartItemCard] to show one detail at a glance.
+/// Neutral (grey) by default; pass [color] for the seller/reference status
+/// chip so it stands out from the rest.
+class _DetailChip extends StatelessWidget {
+  const _DetailChip({required this.icon, required this.label, this.color});
+
+  final IconData icon;
+  final String label;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = color ?? Theme.of(context).colorScheme.onSurface;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: tint.withValues(alpha: color != null ? 0.14 : 0.08),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: tint.withValues(alpha: 0.9)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, color: tint.withValues(alpha: 0.9)),
+          ),
+        ],
       ),
     );
   }
