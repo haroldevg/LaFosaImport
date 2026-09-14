@@ -5,6 +5,7 @@ import '../models/order.dart';
 import '../services/app_update_service.dart';
 import '../services/order_service.dart';
 import '../services/pricing_config.dart';
+import '../theme.dart';
 import 'add_card_item_screen.dart';
 import 'profile_screen.dart';
 
@@ -241,9 +242,14 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final brand = Theme.of(context).extension<LaFosaColors>()!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nuevo pedido'),
+        title: Text(
+          _cartItems.isEmpty
+              ? 'Nuevo pedido'
+              : 'Nuevo pedido · ${_cartItems.length} carta(s)',
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -258,9 +264,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         label: const Text('Agregar carta'),
       ),
       body: _cartItems.isEmpty
-          ? const Center(
-              child: Text('Agrega al menos una carta con el botón de abajo.'),
-            )
+          ? _buildEmptyState(context, brand)
           : ListView.builder(
               padding: const EdgeInsets.only(bottom: 16),
               itemCount: _cartItems.length,
@@ -272,6 +276,14 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     vertical: 6,
                   ),
                   child: ListTile(
+                    leading: Icon(
+                      item.isReferencePrice
+                          ? Icons.help_outline
+                          : Icons.verified_outlined,
+                      color: item.isReferencePrice
+                          ? Colors.amber
+                          : brand.violet,
+                    ),
                     title: Text('${item.cardName}  ×${item.quantity}'),
                     subtitle: Text(
                       [
@@ -303,7 +315,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -313,19 +325,30 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 const SizedBox(height: 8),
               ],
               if (_cartItems.isNotEmpty) ...[
-                _PriceRow('Cartas', _cardsSubtotal),
-                if (_shippingTotal > 0) _PriceRow('Envío', _shippingTotal),
-                _PriceRow(
-                  'Tax estimado (${(fixedTaxRate * 100).toStringAsFixed(0)}%)',
-                  _tax,
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        _PriceRow('Cartas', _cardsSubtotal),
+                        if (_shippingTotal > 0)
+                          _PriceRow('Envío', _shippingTotal),
+                        _PriceRow(
+                          'Tax estimado (${(fixedTaxRate * 100).toStringAsFixed(0)}%)',
+                          _tax,
+                        ),
+                        _PriceRow('Margen de servicio', _margin),
+                        _PriceRow(
+                          'Envío a Perú ($_totalQuantity carta(s) × ${_currency.format(_shippingFeePerCard)})',
+                          _internationalShipping,
+                        ),
+                        const Divider(height: 16),
+                        _PriceRow('Total estimado', _total, bold: true),
+                      ],
+                    ),
+                  ),
                 ),
-                _PriceRow('Margen de servicio', _margin),
-                _PriceRow(
-                  'Envío a Perú ($_totalQuantity carta(s) × ${_currency.format(_shippingFeePerCard)})',
-                  _internationalShipping,
-                ),
-                const Divider(height: 16),
-                _PriceRow('Total estimado', _total, bold: true),
                 const SizedBox(height: 12),
               ],
               FilledButton(
@@ -340,6 +363,57 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, LaFosaColors brand) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 110,
+              height: 110,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: brand.violet.withValues(alpha: 0.12),
+                boxShadow: [
+                  BoxShadow(
+                    color: brand.violet.withValues(alpha: 0.25),
+                    blurRadius: 28,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.add_shopping_cart_outlined,
+                size: 48,
+                color: brand.violet,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Tu carrito está vacío',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Agrega tu primera carta con el botón de abajo.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
         ),
       ),
     );
