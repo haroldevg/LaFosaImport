@@ -91,6 +91,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
+    final brand = Theme.of(context).extension<LaFosaColors>()!;
     return Scaffold(
       appBar: AppBar(
         leading: Padding(
@@ -104,7 +105,24 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             ),
           ),
         ),
-        title: const Text('La Fosa Store'),
+        // Echoes the logo's own lettering: bold, wide-tracked, "STORE" in the
+        // brand violet — instead of the plain default AppBar title style.
+        title: Text.rich(
+          TextSpan(
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.0,
+            ),
+            children: [
+              const TextSpan(text: 'LA FOSA '),
+              TextSpan(
+                text: 'STORE',
+                style: TextStyle(color: brand.violet),
+              ),
+            ],
+          ),
+        ),
         actions: [
           if (widget.isAdmin)
             IconButton(
