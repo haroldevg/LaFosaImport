@@ -6,6 +6,7 @@ import '../main.dart' show routeObserver;
 import '../models/order.dart';
 import '../services/auth_service.dart';
 import '../services/order_service.dart';
+import '../theme.dart';
 import '../widgets/app_version_badge.dart';
 import '../widgets/order_summary_card.dart';
 import '../widgets/whatsapp_reminder_banner.dart';
@@ -116,9 +117,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           IconButton(
             icon: const Icon(Icons.person_outline),
             tooltip: 'Mi perfil',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ProfileScreen()),
-            ),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const ProfileScreen())),
           ),
           IconButton(
             icon: const Icon(Icons.history),
@@ -160,14 +161,52 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     }
     final activeOrder = _activeOrder;
     if (activeOrder == null) {
+      final brand = Theme.of(context).extension<LaFosaColors>()!;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('No tienes ningún pedido activo.'),
-              const SizedBox(height: 16),
+              Container(
+                width: 120,
+                height: 120,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: brand.violet.withValues(alpha: 0.12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: brand.violet.withValues(alpha: 0.25),
+                      blurRadius: 30,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.style_outlined,
+                  size: 56,
+                  color: brand.violet,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Aún no tienes pedidos',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Busca tus cartas en TCGPlayer y arma tu pedido.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 24),
               FilledButton.icon(
                 icon: const Icon(Icons.add),
                 label: const Text('Nuevo pedido'),
@@ -175,6 +214,18 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   MaterialPageRoute(
                     builder: (_) => NewOrderScreen(isAdmin: widget.isAdmin),
                   ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Puedes pegar el link de TCGPlayer o ingresar los datos '
+                'a mano.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               ),
             ],
