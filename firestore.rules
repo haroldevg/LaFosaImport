@@ -22,13 +22,28 @@ service cloud.firestore {
     // that reads it as null but loses the race to write is rejected and
     // retried by the client SDK — so at most one create can win.
     match /users/{uid} {
+      // The name and WhatsApp the staff coordinates deliveries off can only
+      // be changed once a day, so they aren't a moving target mid-order. The
+      // fields Google syncs on every sign-in (email, photoUrl) are not
+      // rate-limited — only what the customer types.
+      function editsRateLimitedFields() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(["displayName", "whatsapp"]);
+      }
+
+      function profileCooldownPassed() {
+        return resource.data.get("profileUpdatedAt", null) == null ||
+          request.time > resource.data.profileUpdatedAt + duration.value(24, 'h');
+      }
+
       allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
 
       allow create: if isSignedIn() && request.auth.uid == uid;
 
       // Owner: profile fields only, never activeOrderId directly.
       allow update: if isSignedIn() && request.auth.uid == uid &&
-        !("activeOrderId" in request.resource.data.diff(resource.data).affectedKeys());
+        !("activeOrderId" in request.resource.data.diff(resource.data).affectedKeys()) &&
+        (!editsRateLimitedFields() || profileCooldownPassed());
 
       // Owner: acquire the lock, only from unlocked. Treat a blank string the
       // same as unset/null — a stray "" (e.g. from a manual console edit)

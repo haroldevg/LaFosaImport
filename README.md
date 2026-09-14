@@ -27,6 +27,14 @@ El número es solo de Perú: el campo muestra `+51` fijo y el usuario escribe lo
 `users/{uid}.whatsapp`; si alguien pega el número con `+51` o `51` adelante, se
 recorta solo.
 
+**Nombre y WhatsApp solo se pueden cambiar una vez cada 24 horas**, contadas
+desde `users/{uid}.profileUpdatedAt`. Dentro de esa ventana la pantalla
+bloquea los campos y muestra cuánto falta; las reglas de Firestore aplican el
+mismo límite del lado del servidor, sin afectar los campos que Google
+sincroniza en cada inicio de sesión (correo y foto). Antes de guardar se pide
+confirmación con los datos a la vista, porque un error de tipeo en el número
+deja al cliente sin poder pedir hasta que pase el día.
+
 **Sin WhatsApp registrado no se puede enviar un pedido.** El bloqueo está en
 `OrderService.createOrder` (lanza `MissingWhatsAppException` antes de tocar la
 base), y la app lo acompaña por dos lados: un aviso rojo en la pantalla

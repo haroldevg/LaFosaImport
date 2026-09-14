@@ -45,6 +45,20 @@ String prettyPeruNumber(String storedNumber) {
       '${national.substring(3, 6)} ${national.substring(6)}';
 }
 
+/// How long a customer has to wait between edits to their name or WhatsApp.
+/// The staff coordinates deliveries off these two fields, so they can't be a
+/// moving target; the same window is enforced in the security rules.
+const profileEditCooldown = Duration(hours: 24);
+
+/// "23 h 41 min" — how long is left before the next edit is allowed.
+String formatCooldownRemaining(Duration remaining) {
+  if (remaining.inMinutes < 1) return 'menos de un minuto';
+  final hours = remaining.inHours;
+  final minutes = remaining.inMinutes % 60;
+  if (hours == 0) return '$minutes min';
+  return '$hours h $minutes min';
+}
+
 /// The `users/{uid}` document: what Google gave us at sign-in plus whatever
 /// the customer edited themselves on the profile screen.
 class UserProfile {
@@ -57,15 +71,33 @@ class UserProfile {
   /// hasn't registered one yet — which is what blocks placing an order.
   final String whatsapp;
 
+  /// When the customer last edited their name or WhatsApp. Null means they
+  /// never have, so the first edit is always allowed.
+  final DateTime? profileUpdatedAt;
+
   const UserProfile({
     required this.uid,
     required this.displayName,
     required this.email,
     required this.whatsapp,
     this.photoUrl,
+    this.profileUpdatedAt,
   });
 
   bool get hasWhatsapp => whatsapp.isNotEmpty;
+
+  /// The moment the next edit becomes possible, or null when there's no wait.
+  DateTime? get nextEditAllowedAt => profileUpdatedAt?.add(profileEditCooldown);
+
+  /// What's left of the cooldown; [Duration.zero] once it has passed.
+  Duration get remainingCooldown {
+    final next = nextEditAllowedAt;
+    if (next == null) return Duration.zero;
+    final left = next.difference(DateTime.now());
+    return left.isNegative ? Duration.zero : left;
+  }
+
+  bool get canEditNow => remainingCooldown == Duration.zero;
 
   /// Just the nine national digits, for prefilling the input that renders
   /// `+51` as a fixed prefix.
@@ -79,6 +111,7 @@ class UserProfile {
       email: data['email'] as String? ?? '',
       photoUrl: data['photoUrl'] as String?,
       whatsapp: data['whatsapp'] as String? ?? '',
+      profileUpdatedAt: (data['profileUpdatedAt'] as Timestamp?)?.toDate(),
     );
   }
 }

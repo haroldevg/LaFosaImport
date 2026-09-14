@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../theme.dart';
 import '../widgets/app_version_badge.dart';
 import 'order_history_screen.dart';
+import 'profile_screen.dart';
 
 /// Shown to signed-in non-admin users instead of [HomeScreen] while
 /// `config/settings.closed` is true in Firestore — e.g. once a promotional
@@ -46,6 +47,18 @@ class AppClosedScreen extends StatelessWidget {
                       ),
                       icon: const Icon(Icons.receipt_long),
                       label: const Text('Ver mis pedidos'),
+                    ),
+                    const SizedBox(height: 12),
+                    // Reachable from here too: a WhatsApp number is required
+                    // to order, so people should be able to register or fix
+                    // one while the convocatoria is closed — otherwise they
+                    // only find out they can't order once it reopens.
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                      ),
+                      icon: const Icon(Icons.person_outline),
+                      label: const Text('Mi perfil'),
                     ),
                     const SizedBox(height: 12),
                     TextButton(
