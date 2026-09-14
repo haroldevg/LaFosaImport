@@ -83,3 +83,19 @@ Después de cambiar reglas, desplegarlas con:
 ```bash
 firebase deploy --only firestore:rules
 ```
+
+## Desplegar la versión web
+
+Compilar siempre con `--no-tree-shake-icons`:
+
+```bash
+flutter build web --release --no-tree-shake-icons
+firebase deploy --only hosting
+```
+
+El recorte automático de íconos de Flutter Web (activado por defecto en
+`--release`) llegó a descartar por error un ícono que sí se usaba
+(`Icons.person_outline`, el de "Mi perfil"): el botón seguía ahí y
+funcionando, pero invisible. Desactivar el recorte cuesta un poco más de peso
+en el bundle (la fuente de íconos completa en vez del subconjunto recortado),
+pero evita que esto se repita con cualquier ícono a futuro.
