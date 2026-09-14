@@ -123,8 +123,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       await ProfileService.instance.updateProfile(
         uid: AuthService.instance.currentUser!.uid,
-        displayName: _nameCtrl.text.trim(),
-        whatsapp: toPeruE164(digits),
+        displayName: _nameCtrl.text,
+        whatsapp: _phoneCtrl.text,
       );
       if (!mounted) return;
       navigator.pop(true);
@@ -135,6 +135,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       );
+    } on InvalidProfileException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = e.message;
+      });
     } on FirebaseException catch (e) {
       // The rules enforce the same window server-side; landing here means
       // this screen's copy of the profile was out of date (another device,
@@ -232,13 +238,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       controller: _nameCtrl,
                       enabled: _canEdit,
                       textCapitalization: TextCapitalization.words,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
                       decoration: const InputDecoration(
-                        labelText: 'Nombre',
+                        labelText: 'Nombre *',
                         helperText:
                             'Así te identifica el staff en tus pedidos.',
                       ),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Ingresa tu nombre'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -251,17 +259,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(11),
                       ],
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
                       decoration: const InputDecoration(
-                        labelText: 'WhatsApp',
+                        labelText: 'WhatsApp *',
                         prefixText: '$peruDialCode ',
                         hintText: '987654321',
                         helperText:
-                            'Solo Perú: 9 dígitos que empiezan con 9. '
-                            'El $peruDialCode se agrega solo.',
+                            'Obligatorio. Solo Perú: 9 dígitos que empiezan '
+                            'con 9. El $peruDialCode se agrega solo.',
                       ),
+                      // Null, vacío y espacios caen todos en el primer caso:
+                      // peruMobileDigits descarta todo lo que no sea dígito.
                       validator: (v) {
                         final digits = peruMobileDigits(v ?? '');
-                        if (digits.isEmpty) return 'Requerido';
+                        if (digits.isEmpty) {
+                          return 'Ingresa tu número de WhatsApp';
+                        }
                         if (!isValidPeruMobile(digits)) {
                           return 'Debe tener 9 dígitos y empezar con 9';
                         }

@@ -84,7 +84,10 @@ class UserProfile {
     this.profileUpdatedAt,
   });
 
-  bool get hasWhatsapp => whatsapp.isNotEmpty;
+  /// Whether there's a number the staff can actually write to. Deliberately
+  /// stricter than "not empty": a blank or whitespace-only value would pass
+  /// `isNotEmpty` and let an order through that nobody can follow up on.
+  bool get hasWhatsapp => isValidPeruMobile(whatsappNationalDigits);
 
   /// The moment the next edit becomes possible, or null when there's no wait.
   DateTime? get nextEditAllowedAt => profileUpdatedAt?.add(profileEditCooldown);

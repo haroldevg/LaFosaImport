@@ -36,13 +36,36 @@ service cloud.firestore {
           request.time > resource.data.profileUpdatedAt + duration.value(24, 'h');
       }
 
+      // A WhatsApp number is either absent (the sign-in sync never writes
+      // one) or a full Peruvian mobile. Never blank, never whitespace, never
+      // null: an order is only allowed to exist against a number the staff
+      // can actually write to.
+      function whatsappValueOk() {
+        return request.resource.data.whatsapp is string &&
+          request.resource.data.whatsapp.matches("^\\+519[0-9]{8}$");
+      }
+
+      // Checked only when the field is actually being written, so an
+      // unrelated write (the email/photo Google syncs on every sign-in)
+      // never gets rejected over a value it isn't touching.
+      function whatsappOkOnCreate() {
+        return !("whatsapp" in request.resource.data) || whatsappValueOk();
+      }
+
+      function whatsappOkOnUpdate() {
+        return !("whatsapp" in request.resource.data.diff(resource.data).affectedKeys()) ||
+          whatsappValueOk();
+      }
+
       allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
 
-      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow create: if isSignedIn() && request.auth.uid == uid &&
+        whatsappOkOnCreate();
 
       // Owner: profile fields only, never activeOrderId directly.
       allow update: if isSignedIn() && request.auth.uid == uid &&
         !("activeOrderId" in request.resource.data.diff(resource.data).affectedKeys()) &&
+        whatsappOkOnUpdate() &&
         (!editsRateLimitedFields() || profileCooldownPassed());
 
       // Owner: acquire the lock, only from unlocked. Treat a blank string the
