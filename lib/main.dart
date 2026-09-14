@@ -17,6 +17,12 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
+/// Lets a screen pushed on top (e.g. "Mis pedidos") tell [HomeScreen] to
+/// pause its active-order listener while it's hidden underneath, instead of
+/// two Firestore listeners running at once for data one of them already has.
+final RouteObserver<PageRoute<void>> routeObserver =
+    RouteObserver<PageRoute<void>>();
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -25,6 +31,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'La Fosa Store',
       theme: buildAppTheme(),
+      navigatorObservers: [routeObserver],
       home: const AuthGate(),
     );
   }
@@ -68,7 +75,9 @@ class _AccessGate extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        if (adminSnap.data == true) return const HomeScreen();
+        if (adminSnap.data == true) {
+          return const HomeScreen(isAdmin: true);
+        }
 
         return StreamBuilder<bool>(
           stream: OrderService.instance.appClosed(),
@@ -80,7 +89,7 @@ class _AccessGate extends StatelessWidget {
             }
             return closedSnap.data == true
                 ? const AppClosedScreen()
-                : const HomeScreen();
+                : const HomeScreen(isAdmin: false);
           },
         );
       },
