@@ -36,7 +36,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with RouteAware {
   StreamSubscription<CardOrder?>? _subscription;
-  CardOrder? _activeOrder;
+  CardOrder? _latestOrder;
   bool _loading = true;
   bool _routeSubscribed = false;
 
@@ -75,10 +75,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     if (_subscription != null) return;
     final uid = AuthService.instance.currentUser!.uid;
     setState(() => _loading = true);
-    _subscription = OrderService.instance.activeOrder(uid).listen((order) {
+    _subscription = OrderService.instance.latestOrder(uid).listen((order) {
       if (!mounted) return;
       setState(() {
-        _activeOrder = order;
+        _latestOrder = order;
         _loading = false;
       });
     });
@@ -173,12 +173,26 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     );
   }
 
+  Widget _newOrderButton() {
+    return FilledButton.icon(
+      icon: const Icon(Icons.add),
+      label: const Text('Nuevo pedido'),
+      onPressed: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => NewOrderScreen(isAdmin: widget.isAdmin),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBody(BuildContext context) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
-    final activeOrder = _activeOrder;
-    if (activeOrder == null) {
+    final latestOrder = _latestOrder;
+    // A delivered or cancelled pedido isn't news any more — it lives in "Mis
+    // pedidos"; home goes back to inviting a new one.
+    if (latestOrder == null || !latestOrder.status.isActive) {
       final brand = Theme.of(context).extension<LaFosaColors>()!;
       return Center(
         child: Padding(
@@ -225,15 +239,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 ),
               ),
               const SizedBox(height: 24),
-              FilledButton.icon(
-                icon: const Icon(Icons.add),
-                label: const Text('Nuevo pedido'),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => NewOrderScreen(isAdmin: widget.isAdmin),
-                  ),
-                ),
-              ),
+              _newOrderButton(),
               const SizedBox(height: 12),
               Text(
                 'Puedes pegar el link de TCGPlayer o ingresar los datos '
@@ -251,24 +257,48 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         ),
       );
     }
+    final blocksNewOrders = latestOrder.status.blocksNewOrders;
     return ListView(
       padding: const EdgeInsets.only(top: 16),
       children: [
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            'Tu pedido activo:',
+            'Tu pedido en curso:',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
-        OrderSummaryCard(order: activeOrder),
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: Text(
-            'No puedes crear un nuevo pedido hasta que este sea entregado.',
-            style: TextStyle(color: Colors.grey),
+        OrderSummaryCard(order: latestOrder),
+        if (blocksNewOrders)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text(
+              'No puedes crear un nuevo pedido hasta que el staff compre este.',
+              style: TextStyle(color: Colors.grey),
+            ),
+          )
+        else ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text(
+              'Este pedido ya fue comprado y sigue su curso. Puedes armar '
+              'otro mientras llega.',
+              style: TextStyle(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _newOrderButton(),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
       ],
     );
   }

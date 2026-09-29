@@ -38,8 +38,8 @@ class MarginTier {
 /// it's never subject to the US sales tax estimate. Applies to non-admin
 /// users only — admins pay no margin (see [marginAmountForItem] callers).
 const List<MarginTier> marginTiers = [
-  MarginTier(from: 0, rangeLabel: 'Hasta \$30', rate: 0.20),
-  MarginTier(from: 30, rangeLabel: '\$31 a \$99', rate: 0.12),
+  MarginTier(from: 0, rangeLabel: 'Hasta \$30', rate: 0.25),
+  MarginTier(from: 30, rangeLabel: '\$31 a \$99', rate: 0.125),
   MarginTier(from: 99, rangeLabel: '\$100 a \$299', rate: 0.075),
   MarginTier(from: 299, rangeLabel: '\$300+', rate: 0.035),
 ];

@@ -14,7 +14,9 @@ service cloud.firestore {
     }
 
     // Profile doc per user, plus the `activeOrderId` lock used to block a
-    // second order request until the current one is delivered/cancelled.
+    // second order request until the current one has been bought (or
+    // shipped, delivered, cancelled — anything past the point where it can
+    // still change).
     // There is no server to trust here, so the "one active order" invariant
     // (and its atomicity under concurrent requests) is enforced by these
     // rules together with Firestore's own transaction semantics: acquiring
@@ -86,16 +88,19 @@ service cloud.firestore {
         request.resource.data.activeOrderId == null;
 
       // Owner: release their own lock, but only once the order it points at
-      // is already finished — which is what lets someone who rejected a price
-      // adjustment (cancelling that order) immediately place a new one,
-      // without opening a way to dodge the one-active-order rule while an
-      // order is still live.
+      // has stopped blocking new ones — bought, shipped, in transit,
+      // delivered or cancelled. That's what lets someone who rejected a
+      // price adjustment (cancelling that order) immediately place a new
+      // one, without opening a way to dodge the one-active-order rule while
+      // the order can still change (pending, priceReview, priceConfirmed,
+      // awaitingPayment).
       allow update: if isSignedIn() && request.auth.uid == uid &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(["activeOrderId"]) &&
         request.resource.data.activeOrderId == null &&
         resource.data.get("activeOrderId", null) != null &&
         resource.data.get("activeOrderId", "") != "" &&
-        get(/databases/$(database)/documents/orders/$(resource.data.activeOrderId)).data.status in ["cancelled", "delivered"];
+        get(/databases/$(database)/documents/orders/$(resource.data.activeOrderId)).data.status in
+          ["ordered", "shipped", "inTransit", "delivered", "cancelled"];
     }
 
     match /orders/{orderId} {

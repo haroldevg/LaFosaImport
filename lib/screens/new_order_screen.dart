@@ -191,7 +191,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     } on ActiveOrderExistsException {
       setState(
         () =>
-            _error = 'Ya tienes un pedido activo. Espera a que sea entregado.',
+            _error =
+                'Ya tienes un pedido en curso. Podrás crear otro cuando el '
+                'staff lo compre.',
       );
     } on MissingWhatsAppException {
       setState(

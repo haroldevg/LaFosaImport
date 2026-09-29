@@ -34,6 +34,18 @@ extension OrderStatusX on OrderStatus {
   bool get isActive =>
       this != OrderStatus.delivered && this != OrderStatus.cancelled;
 
+  /// While an order sits in one of these the customer can't place another
+  /// one: nobody has spent money on it yet, so its contents and its price can
+  /// still move, and a second cart on top would be one more thing to keep in
+  /// sync. From the moment the staff buys it — and through shipping, transit,
+  /// delivery or cancellation — it stops blocking, and the customer can start
+  /// a new pedido while this one is still on its way.
+  bool get blocksNewOrders =>
+      this == OrderStatus.pending ||
+      this == OrderStatus.priceReview ||
+      this == OrderStatus.priceConfirmed ||
+      this == OrderStatus.awaitingPayment;
+
   /// Orders the staff still has to go buy on TCGPlayer: freshly placed ones,
   /// the ones whose reprice the customer already approved, and the ones only
   /// waiting on the customer's payment — all of them still belong on the

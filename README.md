@@ -46,6 +46,28 @@ aparecen en el panel admin y en el reporte "Comprados por entregar" sin tener
 que ir a buscar el perfil. Como es una foto del momento, un pedido viejo
 conserva el número con el que se hizo.
 
+## Un pedido a la vez (hasta que se compre)
+
+Un cliente no puede tener dos pedidos abiertos mientras el primero todavía
+puede cambiar. Los estados que **bloquean** un pedido nuevo son *Pendiente*,
+*Ajuste de precio — por confirmar*, *Precio confirmado* y *Pedido confirmado
+(Pendiente de pago)*; ver `OrderStatusX.blocksNewOrders`.
+
+Apenas el staff lo marca como **Comprado** —y de ahí en adelante: *Enviado*,
+*En tránsito*, *Entregado*, *Cancelado*— el candado se libera y el cliente
+puede armar otro mientras el anterior sigue su curso.
+
+El candado es `users/{uid}.activeOrderId`: se toma dentro de una transacción
+al crear el pedido y lo suelta `updateOrderStatus` cuando el estado nuevo deja
+de bloquear. Las reglas de Firestore exigen lo mismo del lado del servidor —
+solo se puede soltar un candado que apunte a un pedido ya comprado o
+posterior, así que nadie puede saltarse el límite escribiendo el documento a
+mano.
+
+La pantalla principal muestra el **último pedido** mientras siga en curso (no
+el que tiene el candado), así que un pedido ya comprado se sigue viendo ahí
+mientras viaja, con el botón de "Nuevo pedido" al lado.
+
 ## Ajuste de precios de un pedido
 
 Los precios de TCGPlayer cambian constantemente, así que el staff puede

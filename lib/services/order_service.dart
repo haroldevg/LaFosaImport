@@ -20,17 +20,19 @@ class OrderService {
 
   final _db = FirebaseFirestore.instance;
 
-  /// The user's current active order (not delivered/cancelled), or null.
-  Stream<CardOrder?> activeOrder(String uid) {
-    return _db.collection('users').doc(uid).snapshots().asyncMap((
-      userDoc,
-    ) async {
-      final activeOrderId = userDoc.data()?['activeOrderId'] as String?;
-      if (activeOrderId == null || activeOrderId.isEmpty) return null;
-      final orderDoc = await _db.collection('orders').doc(activeOrderId).get();
-      if (!orderDoc.exists) return null;
-      return CardOrder.fromFirestore(orderDoc);
-    });
+  /// The customer's most recent order, or null when they have none — what the
+  /// home screen shows.
+  ///
+  /// Deliberately not driven by the `activeOrderId` lock: that lock is
+  /// released as soon as the order stops blocking new ones (the staff bought
+  /// it), and a customer whose pedido is paid for and in transit should still
+  /// see it on their home screen. Reuses [orderHistory]'s query, so it rides
+  /// the index that already exists rather than needing one of its own.
+  Stream<CardOrder?> latestOrder(String uid) {
+    return orderHistory(
+      uid,
+      limit: 1,
+    ).map((orders) => orders.isEmpty ? null : orders.first);
   }
 
   /// The [limit] most recent orders for this user — capped so a long-time
@@ -308,9 +310,10 @@ class OrderService {
   /// admin check server-side regardless of what the client sends.
   Future<void> updateOrderStatus(String orderId, OrderStatus newStatus) async {
     final orderRef = _db.collection('orders').doc(orderId);
-    final clearsLock =
-        newStatus == OrderStatus.delivered ||
-        newStatus == OrderStatus.cancelled;
+    // Releasing the one-active-order lock is what frees the customer to place
+    // another pedido, so it happens as soon as this one stops blocking —
+    // buying it, not delivering it (see [OrderStatusX.blocksNewOrders]).
+    final clearsLock = !newStatus.blocksNewOrders;
 
     await _db.runTransaction((tx) async {
       // All reads must happen before any writes in a Firestore transaction,
