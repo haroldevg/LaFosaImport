@@ -64,3 +64,6 @@ pubsub-debug.log
 # Environment/secrets, if ever introduced
 .env
 .env.*
+
+# FVM Version Cache
+.fvm/
