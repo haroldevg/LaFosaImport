@@ -218,20 +218,43 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
-  /// One horizontally scrolling row of chips: "Todos" plus every status, in
-  /// lifecycle order. Single choice — tapping the active one clears it.
+  /// "Todos" plus every status, in lifecycle order. Single choice — tapping
+  /// the active one clears it.
+  ///
+  /// Wide screens (the panel is used from a browser) lay every chip out at
+  /// once, wrapped onto as many rows as it takes: a horizontal scroller on
+  /// desktop hides half the statuses behind a gesture a mouse wheel can't
+  /// even perform. Phone-width falls back to that scroller, where wrapping
+  /// ten chips would eat a third of the screen.
   Widget _buildStatusFilter() {
-    return SizedBox(
-      height: 44,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        children: [
-          _statusChip(null, 'Todos'),
-          for (final status in OrderStatus.values)
-            _statusChip(status, status.shortLabel),
-        ],
-      ),
+    final chips = [
+      _statusChip(null, 'Todos'),
+      for (final status in OrderStatus.values)
+        _statusChip(status, status.shortLabel),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 720) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: Wrap(spacing: 8, runSpacing: 8, children: chips),
+          );
+        }
+        return SizedBox(
+          height: 44,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            children: [
+              for (final chip in chips)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: chip,
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -240,20 +263,17 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     final color = status == null
         ? Theme.of(context).colorScheme.primary
         : orderStatusColor(status);
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: selected,
-        showCheckmark: false,
-        selectedColor: color.withValues(alpha: 0.22),
-        side: BorderSide(color: color.withValues(alpha: selected ? 0.9 : 0.3)),
-        labelStyle: TextStyle(
-          color: selected ? color : null,
-          fontWeight: selected ? FontWeight.w600 : null,
-        ),
-        onSelected: (_) => _setStatusFilter(selected ? null : status),
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      showCheckmark: false,
+      selectedColor: color.withValues(alpha: 0.22),
+      side: BorderSide(color: color.withValues(alpha: selected ? 0.9 : 0.3)),
+      labelStyle: TextStyle(
+        color: selected ? color : null,
+        fontWeight: selected ? FontWeight.w600 : null,
       ),
+      onSelected: (_) => _setStatusFilter(selected ? null : status),
     );
   }
 
