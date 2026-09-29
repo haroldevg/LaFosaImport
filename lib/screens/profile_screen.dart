@@ -2,7 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../legal/terms.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/profile_service.dart';
@@ -159,6 +161,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _saving = false;
         _error = 'No se pudo guardar: $e';
       });
+    }
+  }
+
+  /// Abre la versión pública de los términos (`web/terminos.html`): en web
+  /// como pestaña nueva, en el APK en el navegador del sistema. Es la misma
+  /// que se puede compartir por fuera de la app, sin necesidad de cuenta.
+  Future<void> _openTermsWebsite() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final opened = await launchUrl(
+        Uri.parse(legalPublicUrl),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo abrir la página: $legalPublicUrl'),
+          ),
+        );
+      }
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo abrir la página: $e')),
+      );
     }
   }
 
@@ -325,6 +351,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const TermsScreen()),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: _openTermsWebsite,
+                        icon: const Icon(Icons.open_in_new, size: 18),
+                        label: const Text('Ver términos en la web'),
                       ),
                     ),
                   ],
