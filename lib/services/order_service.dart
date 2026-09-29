@@ -14,6 +14,12 @@ class ActiveOrderExistsException implements Exception {}
 /// WhatsApp, so an order without one can't be followed up.
 class MissingWhatsAppException implements Exception {}
 
+/// Thrown by [OrderService.createOrder] when the customer hasn't accepted the
+/// current terms. The access gate normally makes this unreachable — it's the
+/// guard that makes "nobody orders without having accepted" true of the data,
+/// not just of the navigation.
+class TermsNotAcceptedException implements Exception {}
+
 class OrderService {
   OrderService._();
   static final OrderService instance = OrderService._();
@@ -167,7 +173,10 @@ class OrderService {
     // needs to coordinate payment and delivery. Both are copied onto the
     // order so the delivery report doesn't have to chase profile documents.
     final profile = await ProfileService.instance.fetchProfile(user.uid);
-    if (profile == null || !profile.hasWhatsapp) {
+    if (profile == null || !profile.hasAcceptedCurrentTerms) {
+      throw TermsNotAcceptedException();
+    }
+    if (!profile.hasWhatsapp) {
       throw MissingWhatsAppException();
     }
     final displayName = profile.displayName.isNotEmpty

@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../services/google_sign_in_web_button.dart';
 import '../theme.dart';
 import '../widgets/app_version_badge.dart';
+import 'terms_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +18,13 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   String? _error;
   bool _signingIn = false;
+
+  /// Consentimiento previo: la Ley N.° 29733 pide que sea previo, expreso e
+  /// informado, así que el ingreso queda deshabilitado hasta marcarlo, con el
+  /// texto completo a un toque de distancia. La aceptación que queda
+  /// registrada en el servidor es la de la pantalla posterior al ingreso
+  /// (ver `_AccessGate`); esta casilla es la del momento del registro.
+  bool _acceptedTerms = false;
 
   Future<void> _signIn() async {
     setState(() {
@@ -37,6 +45,52 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _signingIn = false);
     }
+  }
+
+  Widget _buildTermsConsent(BuildContext context) {
+    final brand = Theme.of(context).extension<LaFosaColors>()!;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Checkbox(
+          value: _acceptedTerms,
+          onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text(
+                  'He leído y acepto los ',
+                  style: TextStyle(fontSize: 13),
+                ),
+                InkWell(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const TermsScreen()),
+                  ),
+                  child: Text(
+                    'Términos y Condiciones',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: brand.violet,
+                      fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.underline,
+                      decorationColor: brand.violet,
+                    ),
+                  ),
+                ),
+                const Text(
+                  ' y el tratamiento de mis datos personales.',
+                  style: TextStyle(fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -84,17 +138,31 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text('Inicia sesión para solicitar tus cartas.'),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: _buildTermsConsent(context),
+                    ),
+                    const SizedBox(height: 16),
                     if (_signingIn)
                       const CircularProgressIndicator()
                     else if (AuthService.instance.supportsExplicitAuthenticate)
                       ElevatedButton.icon(
-                        onPressed: _signIn,
+                        onPressed: _acceptedTerms ? _signIn : null,
                         icon: const Icon(Icons.login),
                         label: const Text('Iniciar sesión con Google'),
                       )
                     else if (kIsWeb)
-                      renderGoogleSignInButton()
+                      // El botón de Google en web lo dibuja su propio SDK y no
+                      // admite un estado deshabilitado: se bloquea desde
+                      // afuera hasta que la casilla esté marcada.
+                      Opacity(
+                        opacity: _acceptedTerms ? 1 : 0.4,
+                        child: IgnorePointer(
+                          ignoring: !_acceptedTerms,
+                          child: renderGoogleSignInButton(),
+                        ),
+                      )
                     else
                       const Text(
                         'Este dispositivo no soporta el inicio de sesión con Google.',

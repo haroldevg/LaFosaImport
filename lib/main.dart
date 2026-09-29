@@ -3,11 +3,14 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
+import 'models/user_profile.dart';
 import 'screens/app_closed_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/terms_screen.dart';
 import 'services/auth_service.dart';
 import 'services/order_service.dart';
+import 'services/profile_service.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -58,8 +61,10 @@ class AuthGate extends StatelessWidget {
   }
 }
 
-/// Sits between login and [HomeScreen]: admins always get the app; everyone
-/// else sees [AppClosedScreen] while `config/settings.closed` is true.
+/// Sits between login and [HomeScreen]. First barrier: nobody gets in without
+/// having accepted the current terms. After that, admins always get the app;
+/// everyone else sees [AppClosedScreen] while `config/settings.closed` is
+/// true.
 class _AccessGate extends StatelessWidget {
   const _AccessGate({required this.uid});
 
@@ -67,6 +72,26 @@ class _AccessGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Nadie —cliente o admin— pasa de aquí sin una aceptación registrada de
+    // la versión vigente de los términos. Publicar un texto nuevo (subir
+    // termsVersion) vuelve a levantar esta barrera para todos.
+    return StreamBuilder<UserProfile?>(
+      stream: ProfileService.instance.profile(uid),
+      builder: (context, profileSnap) {
+        if (profileSnap.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (!(profileSnap.data?.hasAcceptedCurrentTerms ?? false)) {
+          return const TermsScreen(requireAcceptance: true);
+        }
+        return _buildForAcceptedUser(context);
+      },
+    );
+  }
+
+  Widget _buildForAcceptedUser(BuildContext context) {
     return StreamBuilder<bool>(
       stream: OrderService.instance.isAdmin(uid),
       builder: (context, adminSnap) {

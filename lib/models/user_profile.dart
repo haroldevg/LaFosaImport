@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../legal/terms.dart';
+
 /// Peru's country calling code. The store only imports into Peru, so every
 /// WhatsApp number is stored with this prefix and the customer only ever
 /// types the nine national digits.
@@ -75,6 +77,13 @@ class UserProfile {
   /// never have, so the first edit is always allowed.
   final DateTime? profileUpdatedAt;
 
+  /// Version of the terms this customer accepted, empty if they never have.
+  /// Stored as a version rather than a flag so that publishing a new text
+  /// (see [termsVersion]) asks everyone to accept again instead of silently
+  /// treating an old acceptance as covering the new wording.
+  final String termsAcceptedVersion;
+  final DateTime? termsAcceptedAt;
+
   const UserProfile({
     required this.uid,
     required this.displayName,
@@ -82,7 +91,12 @@ class UserProfile {
     required this.whatsapp,
     this.photoUrl,
     this.profileUpdatedAt,
+    this.termsAcceptedVersion = '',
+    this.termsAcceptedAt,
   });
+
+  /// Whether this customer has accepted the text that's live right now.
+  bool get hasAcceptedCurrentTerms => termsAcceptedVersion == termsVersion;
 
   /// Whether there's a number the staff can actually write to. Deliberately
   /// stricter than "not empty": a blank or whitespace-only value would pass
@@ -115,6 +129,8 @@ class UserProfile {
       photoUrl: data['photoUrl'] as String?,
       whatsapp: data['whatsapp'] as String? ?? '',
       profileUpdatedAt: (data['profileUpdatedAt'] as Timestamp?)?.toDate(),
+      termsAcceptedVersion: data['termsAcceptedVersion'] as String? ?? '',
+      termsAcceptedAt: (data['termsAcceptedAt'] as Timestamp?)?.toDate(),
     );
   }
 }

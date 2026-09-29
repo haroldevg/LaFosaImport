@@ -195,6 +195,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 'Ya tienes un pedido en curso. Podrás crear otro cuando el '
                 'staff lo compre.',
       );
+    } on TermsNotAcceptedException {
+      setState(
+        () => _error =
+            'Debes aceptar los Términos y Condiciones para enviar un pedido.',
+      );
     } on MissingWhatsAppException {
       setState(
         () => _error =

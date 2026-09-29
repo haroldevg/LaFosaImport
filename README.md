@@ -16,6 +16,34 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
+## Términos y Condiciones
+
+El texto vive en un solo lugar, `lib/legal/terms.dart`, con los datos de la
+empresa (razón social, RUC, domicilio, correo, WhatsApp) como constantes al
+inicio del archivo — **hay que completarlos antes de publicar**. La página
+pública `web/terminos.html` repite el mismo contenido en HTML plano y se sirve
+en `/terminos.html` sin cargar la app; si se edita uno, hay que editar el otro.
+
+`termsVersion` es lo que gobierna la aceptación: cada usuario guarda en
+`users/{uid}` la versión que aceptó (`termsAcceptedVersion`) y la fecha
+(`termsAcceptedAt`). Subir esa constante hace que **todos** vuelvan a ver la
+pantalla de aceptación antes de poder seguir usando la app.
+
+Se pide el consentimiento en tres momentos:
+
+1. **Antes de registrarse**: casilla obligatoria en el login, con enlace al
+   texto completo. Mientras no esté marcada, el botón de Google queda
+   bloqueado.
+2. **Después de registrarse**: `_AccessGate` no deja pasar a nadie —cliente o
+   admin— sin una aceptación registrada de la versión vigente; la pantalla
+   solo ofrece "Acepto" o "Cerrar sesión".
+3. **Antes de pedir**: `createOrder` lanza `TermsNotAcceptedException` si el
+   perfil no tiene la aceptación, para que la regla valga sobre los datos y no
+   solo sobre la navegación.
+
+Ya aceptado, el texto sigue disponible desde **Mi perfil**, junto con la
+constancia de qué versión aceptó esa persona y cuándo.
+
 ## Perfil del cliente
 
 Cada usuario tiene una pantalla **Mi perfil** (ícono de persona en la barra

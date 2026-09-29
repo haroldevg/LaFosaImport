@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../legal/terms.dart';
 import '../models/user_profile.dart';
 
 /// Thrown by [ProfileService.updateProfile] when the name is blank or the
@@ -67,6 +68,16 @@ class ProfileService {
       'displayName': name,
       'whatsapp': toPeruE164(digits),
       'profileUpdatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  /// Records that this customer accepted [termsVersion]. Stored as the
+  /// version plus a server-side timestamp, so there's a dated record of what
+  /// exact text each person agreed to — which is the point of asking.
+  Future<void> acceptTerms(String uid) async {
+    await _db.collection('users').doc(uid).set({
+      'termsAcceptedVersion': termsVersion,
+      'termsAcceptedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
 }

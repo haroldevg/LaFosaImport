@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/profile_service.dart';
+import 'terms_screen.dart';
 
 // No explicit locale: the app never calls initializeDateFormatting, so only
 // the default locale's symbols are loaded. A numeric pattern reads the same
@@ -303,6 +304,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             )
                           : const Icon(Icons.save_outlined),
                       label: Text(_saving ? 'Guardando…' : 'Guardar cambios'),
+                    ),
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    // El texto legal tiene que seguir siendo consultable
+                    // después de aceptarlo, junto con la constancia de qué
+                    // versión aceptó esta persona y cuándo.
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.gavel_outlined),
+                      title: const Text('Términos y Condiciones'),
+                      subtitle: Text(
+                        _profile?.termsAcceptedAt != null
+                            ? 'Aceptaste la versión '
+                                  '${_profile!.termsAcceptedVersion} el '
+                                  '${_dateFmt.format(_profile!.termsAcceptedAt!)}'
+                            : 'Léelos cuando quieras',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const TermsScreen()),
+                      ),
                     ),
                   ],
                 ),
