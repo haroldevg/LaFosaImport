@@ -24,6 +24,18 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   bool _togglingIntake = false;
   int _limit = _pageSize;
 
+  /// null = sin filtro (todos los estados).
+  OrderStatus? _statusFilter;
+
+  void _setStatusFilter(OrderStatus? status) {
+    setState(() {
+      _statusFilter = status;
+      // A different filter is a different list: start it from the first page
+      // instead of carrying over however far the previous one was expanded.
+      _limit = _pageSize;
+    });
+  }
+
   /// Opens or closes the convocatoria for every non-admin user. Closing is
   /// confirmed first: it takes effect live and drops everyone who isn't an
   /// admin onto the closed screen mid-session.
@@ -206,10 +218,52 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
+  /// One horizontally scrolling row of chips: "Todos" plus every status, in
+  /// lifecycle order. Single choice — tapping the active one clears it.
+  Widget _buildStatusFilter() {
+    return SizedBox(
+      height: 44,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: [
+          _statusChip(null, 'Todos'),
+          for (final status in OrderStatus.values)
+            _statusChip(status, status.shortLabel),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusChip(OrderStatus? status, String label) {
+    final selected = _statusFilter == status;
+    final color = status == null
+        ? Theme.of(context).colorScheme.primary
+        : orderStatusColor(status);
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(label),
+        selected: selected,
+        showCheckmark: false,
+        selectedColor: color.withValues(alpha: 0.22),
+        side: BorderSide(color: color.withValues(alpha: selected ? 0.9 : 0.3)),
+        labelStyle: TextStyle(
+          color: selected ? color : null,
+          fontWeight: selected ? FontWeight.w600 : null,
+        ),
+        onSelected: (_) => _setStatusFilter(selected ? null : status),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<CardOrder>>(
-      stream: OrderService.instance.allOrders(limit: _limit),
+      stream: OrderService.instance.allOrders(
+        limit: _limit,
+        status: _statusFilter,
+      ),
       builder: (context, snap) {
         final orders = snap.data ?? [];
         return Scaffold(
@@ -270,11 +324,22 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             child: Column(
               children: [
                 _buildIntakeToggle(),
+                _buildStatusFilter(),
                 Expanded(
                   child: snap.connectionState == ConnectionState.waiting
                       ? const Center(child: CircularProgressIndicator())
                       : orders.isEmpty
-                      ? const Center(child: Text('No hay pedidos todavía.'))
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              _statusFilter == null
+                                  ? 'No hay pedidos todavía.'
+                                  : 'No hay pedidos en "${_statusFilter!.label}".',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
                       : ListView.builder(
                           padding: const EdgeInsets.only(top: 8, bottom: 16),
                           // orders.length == _limit means there may be older

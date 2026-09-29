@@ -31,6 +31,14 @@ extension OrderStatusX on OrderStatus {
     OrderStatus.cancelled => 'Cancelado',
   };
 
+  /// Compact wording for tight spots — the admin panel's filter chips — where
+  /// the full label would take the whole row.
+  String get shortLabel => switch (this) {
+    OrderStatus.priceReview => 'Ajuste de precio',
+    OrderStatus.awaitingPayment => 'Pendiente de pago',
+    _ => label,
+  };
+
   bool get isActive =>
       this != OrderStatus.delivered && this != OrderStatus.cancelled;
 

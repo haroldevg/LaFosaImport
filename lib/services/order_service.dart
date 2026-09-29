@@ -55,9 +55,17 @@ class OrderService {
   /// deliberately does **not** use this: it always queries every matching
   /// order directly (see [ordersReadyToBuy] and [purchasedOrders]), so an old
   /// order that scrolled past this limit is never silently left off a report.
-  Stream<List<CardOrder>> allOrders({int limit = 100}) {
-    return _db
-        .collection('orders')
+  /// With a [status], only orders in it — the panel's filter narrows the
+  /// query rather than the page already on screen, so filtering by a rare
+  /// status still reaches back through the whole history instead of showing
+  /// whatever happens to fall inside [limit]. Needs the (status, createdAt)
+  /// composite index declared in firestore.indexes.json.
+  Stream<List<CardOrder>> allOrders({int limit = 100, OrderStatus? status}) {
+    Query<Map<String, dynamic>> query = _db.collection('orders');
+    if (status != null) {
+      query = query.where('status', isEqualTo: status.name);
+    }
+    return query
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .snapshots()

@@ -8,6 +8,21 @@ import 'price_adjustment_actions.dart';
 
 final _currency = NumberFormat.simpleCurrency(name: 'USD');
 
+/// The colour a status is shown in. Shared so the card's chip and the admin
+/// panel's status filter speak the same visual language — a filter chip in a
+/// different colour than the card it filters reads as a different thing.
+Color orderStatusColor(OrderStatus status) => switch (status) {
+  OrderStatus.pending => Colors.orange,
+  OrderStatus.priceReview => Colors.amber,
+  OrderStatus.priceConfirmed => Colors.teal,
+  OrderStatus.awaitingPayment => Colors.deepOrange,
+  OrderStatus.ordered => Colors.blue,
+  OrderStatus.shipped => Colors.purple,
+  OrderStatus.inTransit => Colors.indigo,
+  OrderStatus.delivered => Colors.green,
+  OrderStatus.cancelled => Colors.grey,
+};
+
 class OrderSummaryCard extends StatelessWidget {
   final CardOrder order;
   final bool showRequester;
@@ -27,19 +42,7 @@ class OrderSummaryCard extends StatelessWidget {
       order.awaitsPriceConfirmation &&
       order.userId == AuthService.instance.currentUser?.uid;
 
-  Color _statusColor(BuildContext context) {
-    return switch (order.status) {
-      OrderStatus.pending => Colors.orange,
-      OrderStatus.priceReview => Colors.amber,
-      OrderStatus.priceConfirmed => Colors.teal,
-      OrderStatus.awaitingPayment => Colors.deepOrange,
-      OrderStatus.ordered => Colors.blue,
-      OrderStatus.shipped => Colors.purple,
-      OrderStatus.inTransit => Colors.indigo,
-      OrderStatus.delivered => Colors.green,
-      OrderStatus.cancelled => Colors.grey,
-    };
-  }
+  Color _statusColor(BuildContext context) => orderStatusColor(order.status);
 
   @override
   Widget build(BuildContext context) {
