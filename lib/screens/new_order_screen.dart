@@ -59,7 +59,14 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   /// Comisión de servicio: una por unidad, elegida por el precio unitario de
   /// cada carta (ver [commissionTiers]). No entra en la base del tax. Los
   /// admins no pagan comisión.
-  CartCommission get _cartCommission => commissionForCart(_cartItems);
+  ///
+  /// Memoizado: build() y el ListView de la cart leen esto varias veces cada
+  /// uno, y recorrer _cartItems de nuevo en cada lectura es trabajo repetido
+  /// para un valor que solo cambia cuando el carrito cambia (ver los dos
+  /// setState que invalidan _cartCommissionCache).
+  CartCommission? _cartCommissionCache;
+  CartCommission get _cartCommission =>
+      _cartCommissionCache ??= commissionForCart(_cartItems);
 
   double get _commission => widget.isAdmin ? 0 : _cartCommission.amount;
 
@@ -158,7 +165,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       MaterialPageRoute(builder: (_) => const AddCardItemScreen()),
     );
     if (item == null) return;
-    setState(() => _cartItems.add(item));
+    setState(() {
+      _cartItems.add(item);
+      _cartCommissionCache = null;
+    });
   }
 
   Future<void> _submit() async {
@@ -335,7 +345,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                   brand: brand,
                   isAdmin: widget.isAdmin,
                   bulkCommission: _cartCommission.isPercentage,
-                  onRemove: () => setState(() => _cartItems.removeAt(i)),
+                  onRemove: () => setState(() {
+                    _cartItems.removeAt(i);
+                    _cartCommissionCache = null;
+                  }),
                 );
               },
             ),

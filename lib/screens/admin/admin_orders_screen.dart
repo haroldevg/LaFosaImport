@@ -27,12 +27,25 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   /// null = sin filtro (todos los estados).
   OrderStatus? _statusFilter;
 
+  // Held in state instead of created inline in build(): `allOrders` opens a
+  // Firestore listener, and re-creating it on every setState (including ones
+  // unrelated to the query, like _exporting or _togglingIntake) would drop
+  // and re-subscribe it, re-reading up to _limit orders each time. Only
+  // _setStatusFilter and "Cargar más" actually change the query, so only they
+  // reassign it.
+  late Stream<List<CardOrder>> _ordersStream = _fetchOrders();
+  late final Stream<bool> _appClosedStream = OrderService.instance.appClosed();
+
+  Stream<List<CardOrder>> _fetchOrders() =>
+      OrderService.instance.allOrders(limit: _limit, status: _statusFilter);
+
   void _setStatusFilter(OrderStatus? status) {
     setState(() {
       _statusFilter = status;
       // A different filter is a different list: start it from the first page
       // instead of carrying over however far the previous one was expanded.
       _limit = _pageSize;
+      _ordersStream = _fetchOrders();
     });
   }
 
@@ -183,7 +196,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   /// decides whether every non-admin user sees the app or the closed screen.
   Widget _buildIntakeToggle() {
     return StreamBuilder<bool>(
-      stream: OrderService.instance.appClosed(),
+      stream: _appClosedStream,
       builder: (context, snap) {
         final loading = snap.connectionState == ConnectionState.waiting;
         final closed = snap.data ?? false;
@@ -280,10 +293,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<CardOrder>>(
-      stream: OrderService.instance.allOrders(
-        limit: _limit,
-        status: _statusFilter,
-      ),
+      stream: _ordersStream,
       builder: (context, snap) {
         final orders = snap.data ?? [];
         return Scaffold(
@@ -375,8 +385,10 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                                 ),
                                 child: Center(
                                   child: TextButton(
-                                    onPressed: () =>
-                                        setState(() => _limit += _pageSize),
+                                    onPressed: () => setState(() {
+                                      _limit += _pageSize;
+                                      _ordersStream = _fetchOrders();
+                                    }),
                                     child: const Text('Cargar más'),
                                   ),
                                 ),

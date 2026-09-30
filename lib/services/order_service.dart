@@ -329,10 +329,6 @@ class OrderService {
   /// admin check server-side regardless of what the client sends.
   Future<void> updateOrderStatus(String orderId, OrderStatus newStatus) async {
     final orderRef = _db.collection('orders').doc(orderId);
-    // Releasing the one-active-order lock is what frees the customer to place
-    // another pedido, so it happens as soon as this one stops blocking —
-    // buying it, not delivering it (see [OrderStatusX.blocksNewOrders]).
-    final clearsLock = !newStatus.blocksNewOrders;
 
     await _db.runTransaction((tx) async {
       // All reads must happen before any writes in a Firestore transaction,
@@ -341,9 +337,18 @@ class OrderService {
       if (!orderSnap.exists) return;
       final orderData = orderSnap.data()!;
 
+      // The lock is released the moment the order first stops blocking —
+      // buying it, not delivering it (see [OrderStatusX.blocksNewOrders]) —
+      // so only that one transition needs to touch the user doc. Every later
+      // one (shipped, inTransit, delivered, cancelled-after-ordered) would
+      // just re-read a lock that's already cleared.
+      final currentStatus = OrderStatusX.fromName(orderData['status'] as String);
+      final releasesLock =
+          currentStatus.blocksNewOrders && !newStatus.blocksNewOrders;
+
       DocumentReference<Map<String, dynamic>>? userRef;
       DocumentSnapshot<Map<String, dynamic>>? userSnap;
-      if (clearsLock) {
+      if (releasesLock) {
         userRef = _db.collection('users').doc(orderData['userId'] as String);
         userSnap = await tx.get(userRef);
       }

@@ -65,10 +65,42 @@ class AuthGate extends StatelessWidget {
 /// having accepted the current terms. After that, admins always get the app;
 /// everyone else sees [AppClosedScreen] while `config/settings.closed` is
 /// true.
-class _AccessGate extends StatelessWidget {
+class _AccessGate extends StatefulWidget {
   const _AccessGate({required this.uid});
 
   final String uid;
+
+  @override
+  State<_AccessGate> createState() => _AccessGateState();
+}
+
+class _AccessGateState extends State<_AccessGate> {
+  // Created once per uid instead of inline in build(): the profile doc is
+  // rewritten on every order (activeOrderId), lock release, or profile save,
+  // and re-creating these streams on each of those emissions would drop the
+  // isAdmin/appClosed subscriptions, flash the loading spinner, and tear down
+  // HomeScreen's state along with it.
+  late Stream<UserProfile?> _profileStream;
+  late Stream<bool> _isAdminStream;
+  late Stream<bool> _appClosedStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribe();
+  }
+
+  @override
+  void didUpdateWidget(_AccessGate oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.uid != widget.uid) _subscribe();
+  }
+
+  void _subscribe() {
+    _profileStream = ProfileService.instance.profile(widget.uid);
+    _isAdminStream = OrderService.instance.isAdmin(widget.uid);
+    _appClosedStream = OrderService.instance.appClosed();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +108,7 @@ class _AccessGate extends StatelessWidget {
     // la versión vigente de los términos. Publicar un texto nuevo (subir
     // termsVersion) vuelve a levantar esta barrera para todos.
     return StreamBuilder<UserProfile?>(
-      stream: ProfileService.instance.profile(uid),
+      stream: _profileStream,
       builder: (context, profileSnap) {
         if (profileSnap.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -93,7 +125,7 @@ class _AccessGate extends StatelessWidget {
 
   Widget _buildForAcceptedUser(BuildContext context) {
     return StreamBuilder<bool>(
-      stream: OrderService.instance.isAdmin(uid),
+      stream: _isAdminStream,
       builder: (context, adminSnap) {
         if (adminSnap.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -105,7 +137,7 @@ class _AccessGate extends StatelessWidget {
         }
 
         return StreamBuilder<bool>(
-          stream: OrderService.instance.appClosed(),
+          stream: _appClosedStream,
           builder: (context, closedSnap) {
             if (closedSnap.connectionState == ConnectionState.waiting) {
               return const Scaffold(
