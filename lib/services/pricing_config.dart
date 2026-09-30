@@ -80,8 +80,8 @@ double? commissionForItem(OrderItem item) {
 
 /// Cuando la compra supera este monto, la tabla por unidad deja de aplicar y
 /// el pedido entero paga [bulkCommissionRate] sobre el subtotal de compra.
-const double bulkCommissionThreshold = 200.00;
-const double bulkCommissionRate = 0.08;
+const double bulkCommissionThreshold = 150.00;
+const double bulkCommissionRate = 0.075;
 
 /// Lo que le toca a una línea cuando el carrito paga el porcentaje: su propio
 /// subtotal por la tasa. Es un desglose informativo — los redondeos por línea

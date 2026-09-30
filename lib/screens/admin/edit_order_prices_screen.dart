@@ -193,6 +193,7 @@ class _EditOrderPricesScreenState extends State<EditOrderPricesScreen> {
                   draft: draft,
                   chargesCommission: !widget.order.usesAdminPricing,
                   bulkCommission: totals.commissionIsPercentage,
+                  onChanged: _onChanged,
                 ),
                 const SizedBox(height: 12),
               ],
@@ -291,6 +292,10 @@ class _ItemDraft {
   final TextEditingController shippingCtrl;
   final TextEditingController sellerCtrl;
 
+  /// Editable: cuando el vendedor no tenía todas las unidades, bajarla acá es
+  /// lo único que mueve el envío a Perú, que se cobra por unidad.
+  late int quantity = original.quantity;
+
   double get unitPrice =>
       double.tryParse(priceCtrl.text.trim()) ?? original.unitPrice;
 
@@ -302,7 +307,9 @@ class _ItemDraft {
     return seller.isEmpty ? null : seller;
   }
 
-  double get lineTotal => unitPrice * original.quantity + shipping;
+  double get lineTotal => unitPrice * quantity + shipping;
+
+  bool get quantityChanged => quantity != original.quantity;
 
   /// Compared with a half-cent tolerance: the fields start out rendered to two
   /// decimals, so an untouched line whose stored price had more precision than
@@ -312,7 +319,9 @@ class _ItemDraft {
       (shipping - original.shipping).abs() >= 0.005;
 
   bool get isDirty =>
-      priceChanged || (sellerName ?? '') != (original.sellerName ?? '');
+      priceChanged ||
+      quantityChanged ||
+      (sellerName ?? '') != (original.sellerName ?? '');
 
   /// Rebuilt field by field rather than with a copyWith, so that emptying the
   /// seller box actually clears the seller instead of reading as "unchanged".
@@ -324,7 +333,7 @@ class _ItemDraft {
     listingUrl: original.listingUrl,
     unitPrice: unitPrice,
     shipping: shipping,
-    quantity: original.quantity,
+    quantity: quantity,
     // A price the staff typed in is a real quote, not the customer's own
     // rough estimate any more.
     isReferencePrice: priceChanged ? false : original.isReferencePrice,
@@ -342,9 +351,15 @@ class _ItemPriceEditor extends StatelessWidget {
     required this.draft,
     required this.chargesCommission,
     required this.bulkCommission,
+    required this.onChanged,
   });
 
   final _ItemDraft draft;
+
+  /// Los campos de texto avisan solos por sus controllers; el selector de
+  /// cantidad no tiene uno, así que avisa por acá para que los totales de
+  /// abajo se rehagan al tocarlo.
+  final VoidCallback onChanged;
 
   /// Los pedidos cotizados con el esquema de admin no pagan comisión, así que
   /// mostrar su recálculo ahí solo confundiría.
@@ -370,7 +385,7 @@ class _ItemPriceEditor extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${item.cardName}  ×${item.quantity}',
+              '${item.cardName}  ×${draft.quantity}',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             Text(
@@ -441,6 +456,48 @@ class _ItemPriceEditor extends StatelessWidget {
                 labelText: 'Vendedor (opcional)',
               ),
             ),
+            const SizedBox(height: 12),
+            // Bajarla es el caso real: el vendedor no tenía todas las
+            // unidades. Mover esto rehace el envío a Perú, que se cobra por
+            // unidad, además del subtotal, el tax y la comisión.
+            Row(
+              children: [
+                const Text('Cantidad', style: TextStyle(fontSize: 13)),
+                const SizedBox(width: 4),
+                if (draft.quantityChanged)
+                  Text(
+                    '(antes: ${item.quantity})',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.remove_circle_outline),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: draft.quantity > 1
+                      ? () {
+                          draft.quantity--;
+                          onChanged();
+                        }
+                      : null,
+                ),
+                Text(
+                  '${draft.quantity}',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: draft.quantityChanged ? Colors.orange : null,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () {
+                    draft.quantity++;
+                    onChanged();
+                  },
+                ),
+              ],
+            ),
             if (chargesCommission) ...[
               const SizedBox(height: 12),
               Row(
@@ -457,8 +514,8 @@ class _ItemPriceEditor extends StatelessWidget {
                         : unitCommission == null
                         ? 'sin comisión definida'
                         : '${_currency.format(unitCommission)} c/u × '
-                              '${item.quantity} = '
-                              '${_currency.format(unitCommission * item.quantity)}',
+                              '${draft.quantity} = '
+                              '${_currency.format(unitCommission * draft.quantity)}',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,

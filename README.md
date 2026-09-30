@@ -125,10 +125,13 @@ Los precios de TCGPlayer cambian constantemente, así que el staff puede
 reescribir los precios de un pedido ya enviado:
 
 1. **Panel admin → Editar precios**: se edita el precio unitario, el envío del
-   vendedor y el vendedor de cada carta. El subtotal, el tax, el margen y el
-   envío a Perú se recalculan en vivo con la misma tabla de precios con la que
-   se cotizó el pedido originalmente (los pedidos de un admin conservan su
-   esquema sin margen y con envío reducido).
+   vendedor, el vendedor y la **cantidad** de cada carta. Cualquiera de esos
+   cambios rehace en vivo el subtotal, el tax, la comisión de servicio (que
+   puede saltar de tramo, o pasar al 8% si el pedido cruza los \$200) y el
+   envío a Perú, que depende de la cantidad total de unidades. Se usa la
+   tabla vigente hoy, con el esquema con el que se cotizó el pedido (los
+   pedidos de un admin conservan su esquema sin comisión y con envío
+   reducido).
 2. Al guardar, el pedido pasa al estado **"Ajuste de precio — por confirmar"**.
    No hay email ni notificación push — el cliente ve el aviso la próxima vez
    que abre la app.
