@@ -59,20 +59,24 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   /// Comisión de servicio: una por unidad, elegida por el precio unitario de
   /// cada carta (ver [commissionTiers]). No entra en la base del tax. Los
   /// admins no pagan comisión.
-  double get _commission => widget.isAdmin
-      ? 0
-      : double.parse(
-          _cartItems
-              .fold<double>(
-                0,
-                (acc, item) => acc + (commissionForItem(item) ?? 0),
-              )
-              .toStringAsFixed(2),
-        );
+  CartCommission get _cartCommission => commissionForCart(_cartItems);
+
+  double get _commission => widget.isAdmin ? 0 : _cartCommission.amount;
+
+  /// El porcentaje por compra grande reemplaza a la tabla por unidad, así que
+  /// también reemplaza a su etiqueta: si no se dijera, el monto parecería no
+  /// tener relación con los precios de las cartas.
+  String get _commissionLabel =>
+      (!widget.isAdmin && _cartCommission.isPercentage)
+      ? 'Comisión de servicio '
+            '(${(bulkCommissionRate * 100).toStringAsFixed(0)}%)'
+      : 'Comisión de servicio';
 
   /// Líneas cuyo precio queda por debajo del mínimo con comisión definida.
   /// El formulario de alta ya las rechaza; esto cubre cualquier otra vía.
-  List<OrderItem> get _itemsWithoutCommission => widget.isAdmin
+  /// Con el porcentaje no hay caso: lo paga el carrito entero.
+  List<OrderItem> get _itemsWithoutCommission =>
+      (widget.isAdmin || _cartCommission.isPercentage)
       ? const []
       : _cartItems.where((item) => commissionForItem(item) == null).toList();
 
@@ -124,6 +128,18 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               'carta antes de la comisión. Cartas por debajo de \$0.10 no '
               'tienen comisión definida.',
               style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Compras mayores a '
+              '${_currency.format(bulkCommissionThreshold)}: la comisión pasa '
+              'a ser ${(bulkCommissionRate * 100).toStringAsFixed(0)}% del '
+              'subtotal de la compra, en lugar de la tarifa por unidad.',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ],
         ),
@@ -193,7 +209,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               'Tax estimado (${(fixedTaxRate * 100).toStringAsFixed(0)}%)',
               _tax,
             ),
-            _PriceRow('Comisión de servicio', _commission),
+            _PriceRow(_commissionLabel, _commission),
             _PriceRow(
               'Envío a Perú ($_totalQuantity carta(s) × ${_currency.format(_shippingFeePerCard)})',
               _internationalShipping,
@@ -318,6 +334,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                   item: _cartItems[i],
                   brand: brand,
                   isAdmin: widget.isAdmin,
+                  bulkCommission: _cartCommission.isPercentage,
                   onRemove: () => setState(() => _cartItems.removeAt(i)),
                 );
               },
@@ -373,10 +390,31 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                           icon: Icons.percent,
                         ),
                         _PriceRow(
-                          'Comisión de servicio',
+                          _commissionLabel,
                           _commission,
                           icon: Icons.storefront_outlined,
                         ),
+                        if (!widget.isAdmin && _cartCommission.isPercentage)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: 26,
+                              top: 2,
+                              bottom: 2,
+                            ),
+                            child: Text(
+                              'Tu compra supera '
+                              '${_currency.format(bulkCommissionThreshold)}, '
+                              'así que la comisión es '
+                              '${(bulkCommissionRate * 100).toStringAsFixed(0)}% '
+                              'del subtotal en vez de la tarifa por carta.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.6),
+                              ),
+                            ),
+                          ),
                         _PriceRow(
                           'Envío a Perú ($_totalQuantity carta(s) × ${_currency.format(_shippingFeePerCard)})',
                           _internationalShipping,
@@ -497,12 +535,17 @@ class _CartItemCard extends StatelessWidget {
     required this.item,
     required this.brand,
     required this.isAdmin,
+    required this.bulkCommission,
     required this.onRemove,
   });
 
   final OrderItem item;
   final LaFosaColors brand;
   final bool isAdmin;
+
+  /// El carrito superó el umbral y paga el porcentaje: esta línea muestra su
+  /// parte proporcional en vez de la tarifa de su tramo, que ya no aplica.
+  final bool bulkCommission;
   final VoidCallback onRemove;
 
   @override
@@ -527,8 +570,14 @@ class _CartItemCard extends StatelessWidget {
     final itemTax = double.parse(
       (lineSubtotal * fixedTaxRate).toStringAsFixed(2),
     );
-    final unitCommission = isAdmin ? 0.0 : commissionPerUnit(item.unitPrice);
-    final itemCommission = isAdmin ? 0.0 : commissionForItem(item);
+    final unitCommission = (isAdmin || bulkCommission)
+        ? null
+        : commissionPerUnit(item.unitPrice);
+    final itemCommission = isAdmin
+        ? 0.0
+        : (bulkCommission
+              ? bulkCommissionForItem(item)
+              : commissionForItem(item));
     final itemPeruShipping = double.parse(
       (item.quantity * internationalShippingFeeFor(isAdmin)).toStringAsFixed(2),
     );
@@ -658,9 +707,12 @@ class _CartItemCard extends StatelessWidget {
                 if (itemCommission != null && itemCommission > 0)
                   _DetailChip(
                     icon: Icons.storefront_outlined,
-                    label:
-                        'Comisión ${_currency.format(unitCommission)} c/u '
-                        '= +${_currency.format(itemCommission)}',
+                    label: unitCommission == null
+                        ? 'Comisión '
+                              '${(bulkCommissionRate * 100).toStringAsFixed(0)}%'
+                              ' = +${_currency.format(itemCommission)}'
+                        : 'Comisión ${_currency.format(unitCommission)} c/u '
+                              '= +${_currency.format(itemCommission)}',
                   ),
                 _DetailChip(
                   icon: Icons.flight_takeoff_outlined,

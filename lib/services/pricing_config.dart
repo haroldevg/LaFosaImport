@@ -78,6 +78,85 @@ double? commissionForItem(OrderItem item) {
   return double.parse((perUnit * item.quantity).toStringAsFixed(2));
 }
 
+/// Cuando la compra supera este monto, la tabla por unidad deja de aplicar y
+/// el pedido entero paga [bulkCommissionRate] sobre el subtotal de compra.
+const double bulkCommissionThreshold = 200.00;
+const double bulkCommissionRate = 0.08;
+
+/// Lo que le toca a una línea cuando el carrito paga el porcentaje: su propio
+/// subtotal por la tasa. Es un desglose informativo — los redondeos por línea
+/// pueden sumar uno o dos centavos distinto del cobro del carrito, que es el
+/// que manda.
+double bulkCommissionForItem(OrderItem item) =>
+    double.parse((item.lineTotal * bulkCommissionRate).toStringAsFixed(2));
+
+/// La comisión de servicio de todo un carrito, junto con el detalle de cómo
+/// salió, para que la pantalla pueda explicarla en vez de mostrar un número
+/// suelto.
+class CartCommission {
+  final double amount;
+
+  /// true cuando se aplicó el porcentaje por superar el umbral, en vez de la
+  /// tabla por unidad.
+  final bool isPercentage;
+
+  /// Subtotal de compra (cartas + envío del vendedor) sobre el que se midió
+  /// el umbral y, cuando aplica, se calculó el porcentaje.
+  final double base;
+
+  /// Líneas sin comisión definida (precio bajo el mínimo). Siempre 0 cuando
+  /// manda el porcentaje: ahí la comisión la paga el carrito completo, así
+  /// que el precio de una carta suelta ya no deja nada sin cobrar.
+  final int itemsWithoutCommission;
+
+  const CartCommission({
+    required this.amount,
+    required this.isPercentage,
+    required this.base,
+    required this.itemsWithoutCommission,
+  });
+}
+
+/// Comisión de servicio del carrito.
+///
+/// Hasta [bulkCommissionThreshold] inclusive se cobra la tabla por unidad: una
+/// comisión por cada unidad, según el precio de su carta. Pasado ese monto, el
+/// pedido entero paga [bulkCommissionRate] del subtotal de compra — un cobro
+/// único que **reemplaza** a los de cada línea, no se suma a ellos.
+CartCommission commissionForCart(List<OrderItem> items) {
+  final base = double.parse(
+    items
+        .fold<double>(0, (acc, item) => acc + item.lineTotal)
+        .toStringAsFixed(2),
+  );
+
+  if (base > bulkCommissionThreshold) {
+    return CartCommission(
+      amount: double.parse((base * bulkCommissionRate).toStringAsFixed(2)),
+      isPercentage: true,
+      base: base,
+      itemsWithoutCommission: 0,
+    );
+  }
+
+  var amount = 0.0;
+  var missing = 0;
+  for (final item in items) {
+    final lineCommission = commissionForItem(item);
+    if (lineCommission == null) {
+      missing++;
+      continue;
+    }
+    amount += lineCommission;
+  }
+  return CartCommission(
+    amount: double.parse(amount.toStringAsFixed(2)),
+    isPercentage: false,
+    base: base,
+    itemsWithoutCommission: missing,
+  );
+}
+
 /// The aggregate money figures for a cart, computed in one place so that a
 /// staff reprice (see `OrderService.applyPriceAdjustment`) lands on exactly
 /// the same arithmetic — same rounding, same order of operations — that the
@@ -106,6 +185,15 @@ class OrderTotals {
   /// costó cero: quien muestre estos totales tiene que advertirlo.
   final int itemsWithoutCommission;
 
+  /// true cuando la comisión salió del porcentaje por compra grande y no de
+  /// la tabla por unidad — la pantalla lo dice para que el monto no parezca
+  /// salido de la nada.
+  final bool commissionIsPercentage;
+
+  /// Subtotal de compra sobre el que se midió el umbral y se calculó el
+  /// porcentaje cuando aplica.
+  final double commissionBase;
+
   const OrderTotals({
     required this.subtotal,
     required this.taxRate,
@@ -115,6 +203,8 @@ class OrderTotals {
     required this.total,
     required this.totalQuantity,
     this.itemsWithoutCommission = 0,
+    this.commissionIsPercentage = false,
+    this.commissionBase = 0,
   });
 
   bool get hasItemsWithoutCommission => itemsWithoutCommission > 0;
@@ -129,19 +219,11 @@ class OrderTotals {
     );
     final subtotal = double.parse(rawSubtotal.toStringAsFixed(2));
     final tax = double.parse((subtotal * fixedTaxRate).toStringAsFixed(2));
-    final commission = adminPricing
-        ? 0.0
-        : double.parse(
-            items
-                .fold<double>(
-                  0,
-                  (acc, item) => acc + (commissionForItem(item) ?? 0),
-                )
-                .toStringAsFixed(2),
-          );
+    final cartCommission = commissionForCart(items);
+    final commission = adminPricing ? 0.0 : cartCommission.amount;
     final itemsWithoutCommission = adminPricing
         ? 0
-        : items.where((item) => commissionForItem(item) == null).length;
+        : cartCommission.itemsWithoutCommission;
     final totalQuantity = items.fold<int>(
       0,
       (acc, item) => acc + item.quantity,
@@ -163,6 +245,8 @@ class OrderTotals {
       ),
       totalQuantity: totalQuantity,
       itemsWithoutCommission: itemsWithoutCommission,
+      commissionIsPercentage: !adminPricing && cartCommission.isPercentage,
+      commissionBase: cartCommission.base,
     );
   }
 }

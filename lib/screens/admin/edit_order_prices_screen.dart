@@ -192,6 +192,7 @@ class _EditOrderPricesScreenState extends State<EditOrderPricesScreen> {
                 _ItemPriceEditor(
                   draft: draft,
                   chargesCommission: !widget.order.usesAdminPricing,
+                  bulkCommission: totals.commissionIsPercentage,
                 ),
                 const SizedBox(height: 12),
               ],
@@ -214,7 +215,14 @@ class _EditOrderPricesScreenState extends State<EditOrderPricesScreen> {
                         'Tax estimado (${(totals.taxRate * 100).toStringAsFixed(0)}%)',
                         totals.tax,
                       ),
-                      _TotalRow('Comisión de servicio', totals.commission),
+                      _TotalRow(
+                        totals.commissionIsPercentage
+                            ? 'Comisión de servicio '
+                                  '(${(bulkCommissionRate * 100).toStringAsFixed(0)}% '
+                                  'sobre ${_currency.format(totals.commissionBase)})'
+                            : 'Comisión de servicio',
+                        totals.commission,
+                      ),
                       _TotalRow(
                         'Envío a Perú (${totals.totalQuantity} carta(s))',
                         totals.internationalShipping,
@@ -330,13 +338,21 @@ class _ItemDraft {
 }
 
 class _ItemPriceEditor extends StatelessWidget {
-  const _ItemPriceEditor({required this.draft, required this.chargesCommission});
+  const _ItemPriceEditor({
+    required this.draft,
+    required this.chargesCommission,
+    required this.bulkCommission,
+  });
 
   final _ItemDraft draft;
 
   /// Los pedidos cotizados con el esquema de admin no pagan comisión, así que
   /// mostrar su recálculo ahí solo confundiría.
   final bool chargesCommission;
+
+  /// Con los precios escritos ahora, el pedido supera el umbral y paga el
+  /// porcentaje: la tarifa por tramo de esta línea ya no aplica.
+  final bool bulkCommission;
 
   @override
   Widget build(BuildContext context) {
@@ -435,7 +451,10 @@ class _ItemPriceEditor extends StatelessWidget {
                     style: TextStyle(fontSize: 13),
                   ),
                   Text(
-                    unitCommission == null
+                    bulkCommission
+                        ? '${(bulkCommissionRate * 100).toStringAsFixed(0)}% = '
+                              '${_currency.format(bulkCommissionForItem(draft.toItem()))}'
+                        : unitCommission == null
                         ? 'sin comisión definida'
                         : '${_currency.format(unitCommission)} c/u × '
                               '${item.quantity} = '
@@ -443,16 +462,27 @@ class _ItemPriceEditor extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: unitCommission == null
+                      color: (!bulkCommission && unitCommission == null)
                           ? Theme.of(context).colorScheme.error
-                          : (unitCommission != previousUnitCommission
-                                ? Colors.orange
-                                : null),
+                          : (!bulkCommission &&
+                                unitCommission != previousUnitCommission)
+                          ? Colors.orange
+                          : null,
                     ),
                   ),
                 ],
               ),
-              if (unitCommission != null &&
+              if (bulkCommission)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'El pedido supera '
+                    '${_currency.format(bulkCommissionThreshold)}: paga '
+                    'porcentaje, no tarifa por tramo',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                )
+              else if (unitCommission != null &&
                   previousUnitCommission != null &&
                   unitCommission != previousUnitCommission)
                 Align(
