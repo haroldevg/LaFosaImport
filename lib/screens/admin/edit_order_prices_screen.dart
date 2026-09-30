@@ -198,7 +198,7 @@ class _EditOrderPricesScreenState extends State<EditOrderPricesScreen> {
                         'Tax estimado (${(totals.taxRate * 100).toStringAsFixed(0)}%)',
                         totals.tax,
                       ),
-                      _TotalRow('Margen de servicio', totals.margin),
+                      _TotalRow('Comisión de servicio', totals.commission),
                       _TotalRow(
                         'Envío a Perú (${totals.totalQuantity} carta(s))',
                         totals.internationalShipping,

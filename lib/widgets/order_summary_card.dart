@@ -116,8 +116,11 @@ class OrderSummaryCard extends StatelessWidget {
               '${_currency.format(order.estimatedTax)}',
             ),
             if (order.estimatedMargin > 0)
+              // `estimatedMargin` es el nombre histórico del campo; lo que
+              // guarda hoy es la comisión de servicio por unidad.
               Text(
-                'Margen de servicio: ${_currency.format(order.estimatedMargin)}',
+                'Comisión de servicio: '
+                '${_currency.format(order.estimatedMargin)}',
               ),
             if (order.estimatedInternationalShipping > 0)
               Text(

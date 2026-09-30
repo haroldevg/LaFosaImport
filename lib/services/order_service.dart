@@ -211,7 +211,9 @@ class OrderService {
         'estimatedTaxRate': totals.taxRate,
         'estimatedSubtotal': totals.subtotal,
         'estimatedTax': totals.tax,
-        'estimatedMargin': totals.margin,
+        // Campo histórico: guarda la comisión de servicio (antes era un
+        // margen escalonado). Se mantiene el nombre para no migrar pedidos.
+        'estimatedMargin': totals.commission,
         'estimatedInternationalShipping': totals.internationalShipping,
         'estimatedTotal': totals.total,
         'status': 'pending',
@@ -252,7 +254,7 @@ class OrderService {
       'estimatedTaxRate': totals.taxRate,
       'estimatedSubtotal': totals.subtotal,
       'estimatedTax': totals.tax,
-      'estimatedMargin': totals.margin,
+      'estimatedMargin': totals.commission,
       'estimatedInternationalShipping': totals.internationalShipping,
       'estimatedTotal': totals.total,
       'status': OrderStatus.priceReview.name,

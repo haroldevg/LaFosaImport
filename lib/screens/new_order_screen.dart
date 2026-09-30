@@ -56,51 +56,75 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   double get _internationalShipping =>
       double.parse((_totalQuantity * _shippingFeePerCard).toStringAsFixed(2));
 
-  /// Tiered service margin (see [marginTiers]) — each card's own unit price
-  /// picks its bracket, not subject to US sales tax. Admins pay no margin.
-  double get _margin => widget.isAdmin
+  /// Comisión de servicio: una por unidad, elegida por el precio unitario de
+  /// cada carta (ver [commissionTiers]). No entra en la base del tax. Los
+  /// admins no pagan comisión.
+  double get _commission => widget.isAdmin
       ? 0
       : double.parse(
           _cartItems
-              .fold<double>(0, (acc, item) => acc + marginAmountForItem(item))
+              .fold<double>(
+                0,
+                (acc, item) => acc + (commissionForItem(item) ?? 0),
+              )
               .toStringAsFixed(2),
         );
 
+  /// Líneas cuyo precio queda por debajo del mínimo con comisión definida.
+  /// El formulario de alta ya las rechaza; esto cubre cualquier otra vía.
+  List<OrderItem> get _itemsWithoutCommission => widget.isAdmin
+      ? const []
+      : _cartItems.where((item) => commissionForItem(item) == null).toList();
+
   double get _total => double.parse(
-    (_subtotal + _tax + _margin + _internationalShipping).toStringAsFixed(2),
+    (_subtotal + _tax + _commission + _internationalShipping).toStringAsFixed(
+      2,
+    ),
   );
 
-  void _showMarginTable() {
+  void _showCommissionTable() {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Tabla de margen escalonado'),
-        content: Table(
-          border: TableBorder.all(color: Theme.of(context).dividerColor),
-          columnWidths: const {
-            0: FlexColumnWidth(1.2),
-            1: FlexColumnWidth(1.3),
-            2: FlexColumnWidth(1),
-          },
+        title: const Text('Comisión por unidad'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TableRow(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              ),
-              children: const [
-                _TableCell('Desde (USD)', header: true),
-                _TableCell('Rango', header: true),
-                _TableCell('Margen %', header: true),
+            Table(
+              border: TableBorder.all(color: Theme.of(context).dividerColor),
+              columnWidths: const {
+                0: FlexColumnWidth(1.1),
+                1: FlexColumnWidth(1.4),
+              },
+              children: [
+                TableRow(
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                  ),
+                  children: const [
+                    _TableCell('Precio unitario', header: true),
+                    _TableCell('Comisión', header: true),
+                  ],
+                ),
+                for (final tier in commissionTiers)
+                  TableRow(
+                    children: [
+                      _TableCell(tier.rangeLabel),
+                      _TableCell(tier.feeLabel),
+                    ],
+                  ),
               ],
             ),
-            for (final tier in marginTiers)
-              TableRow(
-                children: [
-                  _TableCell(tier.from.toStringAsFixed(2)),
-                  _TableCell(tier.rangeLabel),
-                  _TableCell('${(tier.rate * 100).toStringAsFixed(2)}%'),
-                ],
-              ),
+            const SizedBox(height: 12),
+            const Text(
+              'Se cobra una comisión por cada unidad, según el precio de la '
+              'carta antes de la comisión. Cartas por debajo de \$0.10 no '
+              'tienen comisión definida.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
           ],
         ),
         actions: [
@@ -124,6 +148,20 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   Future<void> _submit() async {
     if (_cartItems.isEmpty) return;
     setState(() => _error = null);
+
+    // Una línea sin comisión definida no se puede cotizar: cobrar cero sería
+    // inventar un precio que la tabla no fija.
+    final uncommissioned = _itemsWithoutCommission;
+    if (uncommissioned.isNotEmpty) {
+      setState(
+        () => _error =
+            'No hay comisión definida para precios menores a '
+            '${_currency.format(minimumCommissionablePrice)}: '
+            '${uncommissioned.map((i) => i.cardName).join(', ')}. '
+            'Corrige el precio o quita esa carta del pedido.',
+      );
+      return;
+    }
 
     setState(() => _submitting = true);
     final canSubmit = await AppUpdateService.instance.canSubmitOrders();
@@ -155,7 +193,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               'Tax estimado (${(fixedTaxRate * 100).toStringAsFixed(0)}%)',
               _tax,
             ),
-            _PriceRow('Margen de servicio', _margin),
+            _PriceRow('Comisión de servicio', _commission),
             _PriceRow(
               'Envío a Perú ($_totalQuantity carta(s) × ${_currency.format(_shippingFeePerCard)})',
               _internationalShipping,
@@ -260,8 +298,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
-            tooltip: 'Ver tabla de margen',
-            onPressed: _showMarginTable,
+            tooltip: 'Ver tabla de comisiones',
+            onPressed: _showCommissionTable,
           ),
         ],
       ),
@@ -335,8 +373,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                           icon: Icons.percent,
                         ),
                         _PriceRow(
-                          'Margen de servicio',
-                          _margin,
+                          'Comisión de servicio',
+                          _commission,
                           icon: Icons.storefront_outlined,
                         ),
                         _PriceRow(
@@ -489,16 +527,14 @@ class _CartItemCard extends StatelessWidget {
     final itemTax = double.parse(
       (lineSubtotal * fixedTaxRate).toStringAsFixed(2),
     );
-    final itemMargin = isAdmin
-        ? 0.0
-        : double.parse(marginAmountForItem(item).toStringAsFixed(2));
+    final unitCommission = isAdmin ? 0.0 : commissionPerUnit(item.unitPrice);
+    final itemCommission = isAdmin ? 0.0 : commissionForItem(item);
     final itemPeruShipping = double.parse(
       (item.quantity * internationalShippingFeeFor(isAdmin)).toStringAsFixed(2),
     );
     final itemGrandTotal = double.parse(
-      (lineSubtotal + itemTax + itemMargin + itemPeruShipping).toStringAsFixed(
-        2,
-      ),
+      (lineSubtotal + itemTax + (itemCommission ?? 0) + itemPeruShipping)
+          .toStringAsFixed(2),
     );
 
     return Card(
@@ -568,6 +604,27 @@ class _CartItemCard extends StatelessWidget {
             const SizedBox(height: 12),
             Divider(height: 1, color: Theme.of(context).dividerColor),
             const SizedBox(height: 10),
+            // Precio unitario × cantidad, a la vista: es el número con el que
+            // se elige el tramo de comisión, así que esconderlo dejaría el
+            // resto del desglose sin punto de partida.
+            Text(
+              '${_currency.format(item.unitPrice)} c/u × ${item.quantity} = '
+              '${_currency.format(item.unitPrice * item.quantity)}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            if (itemCommission == null && !isAdmin)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Sin comisión definida: el precio está por debajo de '
+                  '${_currency.format(minimumCommissionablePrice)}.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 6,
@@ -598,10 +655,12 @@ class _CartItemCard extends StatelessWidget {
                   icon: Icons.percent,
                   label: 'Tax +${_currency.format(itemTax)}',
                 ),
-                if (itemMargin > 0)
+                if (itemCommission != null && itemCommission > 0)
                   _DetailChip(
                     icon: Icons.storefront_outlined,
-                    label: 'Margen +${_currency.format(itemMargin)}',
+                    label:
+                        'Comisión ${_currency.format(unitCommission)} c/u '
+                        '= +${_currency.format(itemCommission)}',
                   ),
                 _DetailChip(
                   icon: Icons.flight_takeoff_outlined,

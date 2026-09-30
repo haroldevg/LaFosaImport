@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../models/order.dart';
 import '../services/listing_scraper_service.dart';
+import '../services/pricing_config.dart';
 
 final _currency = NumberFormat.simpleCurrency(name: 'USD');
 
@@ -397,6 +398,12 @@ class _AddCardItemScreenState extends State<AddCardItemScreen> {
                     if (v == null || v.trim().isEmpty) return 'Requerido';
                     final parsed = double.tryParse(v.trim());
                     if (parsed == null || parsed <= 0) return 'Precio inválido';
+                    // La tabla de comisiones empieza en $0.10; por debajo no
+                    // hay una definida, así que la carta no se puede cotizar.
+                    if (commissionPerUnit(parsed) == null) {
+                      return 'Sin comisión definida para precios menores a '
+                          '\$${minimumCommissionablePrice.toStringAsFixed(2)}';
+                    }
                     return null;
                   },
                 ),

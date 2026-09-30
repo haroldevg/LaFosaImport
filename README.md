@@ -16,6 +16,29 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
+## Comisión de servicio
+
+Cada **unidad** comprada paga una comisión, elegida por el precio unitario de
+la carta antes de sumarle nada (`lib/services/pricing_config.dart`):
+
+| Precio unitario | Comisión por unidad |
+|---|---|
+| \$0.10 a \$2.00 | \$0.25 |
+| \$2.01 a \$30.00 | \$1.30 |
+| Más de \$30.00 | 5% del precio |
+
+Por debajo de \$0.10 **no hay comisión definida**: el formulario de alta
+rechaza esos precios y el carrito no deja enviar el pedido, porque cobrar cero
+sería inventar un precio que la tabla no fija.
+
+La comisión reemplazó al margen escalonado por porcentaje. El resto del
+cálculo no cambió: el total sigue siendo subtotal (cartas + envío del
+vendedor) + tax estimado 10% + comisión + envío a Perú por unidad. Los admins
+no pagan comisión y pagan envío reducido.
+
+En Firestore la comisión se guarda en `estimatedMargin`, el nombre que tenía
+cuando era un margen; se mantuvo para no migrar los pedidos existentes.
+
 ## Términos y Condiciones
 
 El texto vive en un solo lugar, `lib/legal/terms.dart`, con los datos de la
