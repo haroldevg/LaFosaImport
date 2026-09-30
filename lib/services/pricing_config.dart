@@ -9,7 +9,7 @@ const double fixedTaxRate = 0.10;
 /// and forwarding the cards from the US forwarder address to Peru. This is
 /// the business's own handling fee, not part of the TCGPlayer purchase, so
 /// it is never subject to the US sales tax estimate. Admins pay a reduced fee.
-const double internationalShippingFeePerCard = 0.85;
+const double internationalShippingFeePerCard = 0.75;
 const double adminInternationalShippingFeePerCard = 0.5;
 
 double internationalShippingFeeFor(bool isAdmin) => isAdmin
