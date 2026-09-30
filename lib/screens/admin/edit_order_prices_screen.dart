@@ -75,6 +75,17 @@ class _EditOrderPricesScreenState extends State<EditOrderPricesScreen> {
       setState(() => _error = 'No cambiaste ningún precio todavía.');
       return;
     }
+    // El validador del campo ya lo impide; esto cubre cualquier otra vía,
+    // porque guardar con comisión indefinida la cobraría como cero.
+    if (_totals.hasItemsWithoutCommission) {
+      setState(
+        () => _error =
+            'Hay ${_totals.itemsWithoutCommission} carta(s) con un precio '
+            'menor a ${_currency.format(minimumCommissionablePrice)}, donde '
+            'no hay comisión definida. Corrige esos precios.',
+      );
+      return;
+    }
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -170,13 +181,18 @@ class _EditOrderPricesScreenState extends State<EditOrderPricesScreen> {
               const SizedBox(height: 8),
               const Text(
                 'Actualiza el precio de cada carta con lo que realmente cuesta '
-                'ahora en TCGPlayer. Los cálculos se rehacen solos y el cliente '
-                'tendrá que confirmar el nuevo total.',
+                'ahora en TCGPlayer. Al cambiar un precio se recalculan el tax, '
+                'la comisión de servicio (que puede saltar de tramo) y el envío '
+                'a Perú, siempre con la tabla vigente hoy. El cliente tendrá '
+                'que confirmar el nuevo total.',
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
               const SizedBox(height: 16),
               for (final draft in _drafts) ...[
-                _ItemPriceEditor(draft: draft),
+                _ItemPriceEditor(
+                  draft: draft,
+                  chargesCommission: !widget.order.usesAdminPricing,
+                ),
                 const SizedBox(height: 12),
               ],
               TextFormField(
@@ -314,14 +330,23 @@ class _ItemDraft {
 }
 
 class _ItemPriceEditor extends StatelessWidget {
-  const _ItemPriceEditor({required this.draft});
+  const _ItemPriceEditor({required this.draft, required this.chargesCommission});
 
   final _ItemDraft draft;
+
+  /// Los pedidos cotizados con el esquema de admin no pagan comisión, así que
+  /// mostrar su recálculo ahí solo confundiría.
+  final bool chargesCommission;
 
   @override
   Widget build(BuildContext context) {
     final item = draft.original;
     final delta = draft.lineTotal - item.lineTotal;
+    // Comisión recalculada con el precio que está escrito ahora mismo: el
+    // tramo puede saltar con un cambio de centavos, y el staff tiene que ver
+    // ese salto mientras escribe, no recién en el total de abajo.
+    final unitCommission = commissionPerUnit(draft.unitPrice);
+    final previousUnitCommission = commissionPerUnit(item.unitPrice);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -359,6 +384,13 @@ class _ItemPriceEditor extends StatelessWidget {
                       if (parsed == null || parsed <= 0) {
                         return 'Precio inválido';
                       }
+                      // Mismo límite que al agregar la carta: por debajo de
+                      // $0.10 la tabla no define comisión, y dejar pasar el
+                      // precio la volvería cero sin avisar.
+                      if (commissionPerUnit(parsed) == null) {
+                        return 'Sin comisión definida bajo '
+                            '\$${minimumCommissionablePrice.toStringAsFixed(2)}';
+                      }
                       return null;
                     },
                   ),
@@ -393,6 +425,45 @@ class _ItemPriceEditor extends StatelessWidget {
                 labelText: 'Vendedor (opcional)',
               ),
             ),
+            if (chargesCommission) ...[
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Comisión recalculada',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  Text(
+                    unitCommission == null
+                        ? 'sin comisión definida'
+                        : '${_currency.format(unitCommission)} c/u × '
+                              '${item.quantity} = '
+                              '${_currency.format(unitCommission * item.quantity)}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: unitCommission == null
+                          ? Theme.of(context).colorScheme.error
+                          : (unitCommission != previousUnitCommission
+                                ? Colors.orange
+                                : null),
+                    ),
+                  ),
+                ],
+              ),
+              if (unitCommission != null &&
+                  previousUnitCommission != null &&
+                  unitCommission != previousUnitCommission)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Cambió de tramo: antes '
+                    '${_currency.format(previousUnitCommission)} c/u',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                ),
+            ],
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
