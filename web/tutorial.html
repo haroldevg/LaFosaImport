@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<!--
+  Tutorial público para nuevos usuarios. Se sirve tal cual en
+  https://<dominio>/tutorial.html: Firebase Hosting entrega los archivos que
+  existen antes de aplicar el rewrite a index.html, así que esta página no
+  carga la aplicación Flutter y se abre al instante — enlazable por WhatsApp
+  sin necesidad de abrir la app ni iniciar sesión. Mismo patrón y paleta que
+  terminos.html.
+
+  Si cambian los textos de botones/pantallas en la app (login_screen.dart,
+  add_card_item_screen.dart, new_order_screen.dart, profile_screen.dart,
+  models/order.dart), hay que revisar que esta guía siga describiéndolos tal
+  cual aparecen.
+-->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cómo usar La Fosa Store — Tutorial</title>
+  <meta name="description" content="Guía paso a paso para pedir cartas TCG desde Estados Unidos con La Fosa Store: ingresar, armar tu pedido y hacerle seguimiento.">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <style>
+    :root {
+      --bg: #0a0a0d;
+      --surface: #16141c;
+      --surface-high: #211d2b;
+      --violet: #9b4dff;
+      --violet-soft: rgba(155, 77, 255, 0.14);
+      --bone: #e7e1ce;
+      --muted: #9d95b0;
+      --amber: #f0b429;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px 16px 64px;
+      background: var(--bg);
+      color: var(--bone);
+      font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.65;
+    }
+    main {
+      max-width: 780px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid rgba(155, 77, 255, 0.28);
+      border-radius: 16px;
+      padding: 40px 32px;
+    }
+    header { border-bottom: 1px solid rgba(155, 77, 255, 0.2); padding-bottom: 20px; margin-bottom: 28px; }
+    .brand { color: #fff; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px; }
+    h1 { color: var(--violet); font-size: 26px; line-height: 1.25; margin: 0 0 8px; }
+    .subtitle { color: var(--muted); font-size: 14px; margin: 0; }
+    p { margin: 0 0 12px; }
+    ul, ol { margin: 0 0 12px; padding-left: 22px; }
+    li { margin-bottom: 6px; }
+    a { color: var(--violet); }
+
+    .step {
+      display: flex;
+      gap: 16px;
+      margin: 0 0 36px;
+    }
+    .step-number {
+      flex: none;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--violet-soft);
+      border: 1px solid rgba(155, 77, 255, 0.4);
+      color: var(--violet);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .step-body { flex: 1; min-width: 0; }
+    .step-body h2 { font-size: 18px; margin: 4px 0 8px; color: #fff; }
+    .step-body h3 { font-size: 14px; margin: 16px 0 6px; color: var(--bone); }
+
+    .btn-label {
+      display: inline-block;
+      background: var(--surface-high);
+      border: 1px solid rgba(155, 77, 255, 0.4);
+      color: var(--bone);
+      border-radius: 8px;
+      padding: 3px 10px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .field-label {
+      display: inline-block;
+      color: var(--violet);
+      font-weight: 600;
+    }
+
+    .tip {
+      background: var(--violet-soft);
+      border: 1px solid rgba(155, 77, 255, 0.3);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13px;
+      margin: 10px 0;
+    }
+    .warn {
+      background: rgba(240, 180, 41, 0.1);
+      border: 1px solid rgba(240, 180, 41, 0.35);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13px;
+      margin: 10px 0;
+      color: var(--bone);
+    }
+    .warn strong { color: var(--amber); }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 12px 0;
+    }
+    .card-mini {
+      background: var(--surface-high);
+      border: 1px solid rgba(155, 77, 255, 0.22);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .card-mini h4 { margin: 0 0 6px; font-size: 13px; color: var(--violet); }
+    .card-mini p, .card-mini ul { font-size: 13px; margin-bottom: 0; }
+    .card-mini ul { padding-left: 18px; }
+
+    table.statuses {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin: 10px 0 12px;
+    }
+    table.statuses td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(155, 77, 255, 0.15);
+      vertical-align: top;
+    }
+    table.statuses td:first-child {
+      white-space: nowrap;
+      font-weight: 600;
+      color: #fff;
+      width: 42%;
+    }
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+      background: var(--violet);
+    }
+
+    footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(155, 77, 255, 0.2); color: var(--muted); font-size: 13px; }
+
+    @media (max-width: 600px) {
+      main { padding: 28px 20px; border-radius: 12px; }
+      h1 { font-size: 22px; }
+      .two-col { grid-template-columns: 1fr; }
+      .step { gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="brand">La Fosa Store</p>
+      <h1>Cómo usar La Fosa Store</h1>
+      <p class="subtitle">Guía paso a paso para pedir tus cartas TCG desde Estados Unidos hacia el Perú.</p>
+    </header>
+
+    <div class="step">
+      <div class="step-number">1</div>
+      <div class="step-body">
+        <h2>Inicia sesión con Google</h2>
+        <p>
+          Abre la app, marca la casilla «He leído y acepto los Términos y
+          Condiciones y el tratamiento de mis datos personales» y toca
+          <span class="btn-label">Iniciar sesión con Google</span>. No se crea
+          ninguna contraseña nueva: usas tu cuenta de Google de siempre.
+        </p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">2</div>
+      <div class="step-body">
+        <h2>Acepta los Términos y Condiciones</h2>
+        <p>
+          La primera vez que entras, la app te muestra el texto completo de
+          los términos y te pide confirmarlo. Es un paso obligatorio: sin
+          esa aceptación no puedes ver el resto de la app. Puedes leerlos de
+          nuevo cuando quieras desde tu perfil, o en
+          <a href="/terminos.html">esta página</a>.
+        </p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">3</div>
+      <div class="step-body">
+        <h2>Completa tu perfil</h2>
+        <p>
+          Toca el ícono de persona (arriba a la derecha) para abrir
+          <strong>Mi perfil</strong> y completa:
+        </p>
+        <ul>
+          <li><span class="field-label">Nombre</span> — con el que el staff te identifica en tus pedidos.</li>
+          <li><span class="field-label">WhatsApp</span> — 9 dígitos, empezando con 9. Es el número que usamos para coordinar tu pago y tu entrega.</li>
+        </ul>
+        <div class="warn">
+          <strong>Importante:</strong> no podrás crear un pedido sin un
+          WhatsApp válido guardado. Y una vez que guardas estos datos, solo
+          puedes volver a editarlos 24 horas después — revisa bien el número
+          antes de confirmar.
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">4</div>
+      <div class="step-body">
+        <h2>Crea tu pedido</h2>
+        <p>
+          En la pantalla principal, toca <span class="btn-label">+ Nuevo pedido</span>
+          y luego <span class="btn-label">Agregar carta</span>. Tienes dos formas de cargar cada carta:
+        </p>
+        <div class="two-col">
+          <div class="card-mini">
+            <h4>Con link de TCGPlayer</h4>
+            <ul>
+              <li>Pega el link del producto (tcgplayer.com/product/...)</li>
+              <li>Toca <em>Buscar vendedores</em></li>
+              <li>Elige un vendedor de la lista — precio, condición y stock vienen de ahí</li>
+              <li>La cantidad no puede pasar el stock del vendedor</li>
+            </ul>
+          </div>
+          <div class="card-mini">
+            <h4>Manual</h4>
+            <ul>
+              <li>Escribe el nombre de la carta, el set y la condición</li>
+              <li>Ingresa un precio referencial — el staff confirma el precio y el vendedor reales al comprar</li>
+              <li>Vendedor y envío son opcionales</li>
+              <li>Es la única opción disponible en la versión web</li>
+            </ul>
+          </div>
+        </div>
+        <p>
+          Repite el proceso para cada carta que quieras agregar al mismo
+          pedido. Puedes ver el total estimado (subtotal, impuesto, comisión
+          de servicio y envío internacional) antes de enviarlo.
+        </p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">5</div>
+      <div class="step-body">
+        <h2>Envía tu pedido</h2>
+        <p>
+          Cuando ya agregaste todas las cartas, revisa el
+          <strong>Total estimado</strong> y toca
+          <span class="btn-label">Enviar pedido</span>. A partir de ahí tu
+          pedido queda registrado y el staff empieza a gestionarlo.
+        </p>
+        <div class="warn">
+          <strong>Solo un pedido activo a la vez:</strong> no podrás crear
+          otro hasta que el actual sea comprado por el staff (o lo
+          canceles). Una vez comprado, sí puedes armar uno nuevo aunque el
+          anterior siga en camino.
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">6</div>
+      <div class="step-body">
+        <h2>Haz seguimiento a tu pedido</h2>
+        <p>
+          Desde la pantalla principal ves tu pedido en curso. Para ver
+          pedidos anteriores, toca el ícono de reloj (<strong>Historial</strong>).
+          Estos son los estados por los que pasa un pedido:
+        </p>
+        <table class="statuses">
+          <tr><td><span class="dot"></span>Pendiente</td><td>Acabas de enviarlo; el staff aún no lo revisa.</td></tr>
+          <tr><td><span class="dot"></span>Ajuste de precio — por confirmar</td><td>El precio en TCGPlayer cambió. Tienes que aceptar o rechazar el nuevo total — sin tu aprobación no se compra nada.</td></tr>
+          <tr><td><span class="dot"></span>Precio confirmado</td><td>Aceptaste el precio; el staff ya puede comprar.</td></tr>
+          <tr><td><span class="dot"></span>Pedido confirmado (Pendiente de pago)</td><td>Coordina el pago por WhatsApp con el staff.</td></tr>
+          <tr><td><span class="dot"></span>Comprado</td><td>El staff ya compró tus cartas en TCGPlayer.</td></tr>
+          <tr><td><span class="dot"></span>Enviado / En tránsito</td><td>Tus cartas vienen en camino hacia Perú.</td></tr>
+          <tr><td><span class="dot"></span>Entregado</td><td>Pedido completado.</td></tr>
+          <tr><td><span class="dot"></span>Cancelado</td><td>El pedido no sigue adelante — puedes crear uno nuevo de inmediato.</td></tr>
+        </table>
+        <div class="tip">
+          Si tu pedido pasa a <em>«Ajuste de precio»</em>, ábrelo y usa los
+          botones para <strong>aceptar</strong> el nuevo total o
+          <strong>rechazar y cancelar</strong> — mientras no respondas, el
+          staff no compra nada.
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <p>
+        ¿Dudas? Escríbenos por WhatsApp o revisa los
+        <a href="/terminos.html">Términos y Condiciones</a>.
+      </p>
+      <p>
+        <a href="/">← Volver a La Fosa Store</a>
+      </p>
+    </footer>
+  </main>
+</body>
+</html>

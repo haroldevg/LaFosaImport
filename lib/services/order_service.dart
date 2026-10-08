@@ -65,9 +65,18 @@ class OrderService {
   /// query rather than the page already on screen, so filtering by a rare
   /// status still reaches back through the whole history instead of showing
   /// whatever happens to fall inside [limit]. Needs the (status, createdAt)
-  /// composite index declared in firestore.indexes.json.
-  Stream<List<CardOrder>> allOrders({int limit = 100, OrderStatus? status}) {
+  /// composite index declared in firestore.indexes.json. With a [userId],
+  /// only that customer's orders — narrowed in the query for the same reason;
+  /// combined with [status] it needs the (userId, status, createdAt) index.
+  Stream<List<CardOrder>> allOrders({
+    int limit = 100,
+    OrderStatus? status,
+    String? userId,
+  }) {
     Query<Map<String, dynamic>> query = _db.collection('orders');
+    if (userId != null) {
+      query = query.where('userId', isEqualTo: userId);
+    }
     if (status != null) {
       query = query.where('status', isEqualTo: status.name);
     }

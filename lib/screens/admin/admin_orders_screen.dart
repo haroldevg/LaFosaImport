@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../models/order.dart';
+import '../../models/user_profile.dart';
 import '../../services/order_export_service.dart';
 import '../../services/order_service.dart';
+import '../../services/profile_service.dart';
 import '../../widgets/order_summary_card.dart';
 import 'edit_order_prices_screen.dart';
 
@@ -36,8 +38,19 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   late Stream<List<CardOrder>> _ordersStream = _fetchOrders();
   late final Stream<bool> _appClosedStream = OrderService.instance.appClosed();
 
-  Stream<List<CardOrder>> _fetchOrders() =>
-      OrderService.instance.allOrders(limit: _limit, status: _statusFilter);
+  /// null = todas las personas.
+  UserProfile? _personFilter;
+
+  // Loaded the first time the picker opens and kept for the life of the
+  // screen: one read per customer, not worth repeating on every open.
+  List<UserProfile>? _profiles;
+  bool _loadingPeople = false;
+
+  Stream<List<CardOrder>> _fetchOrders() => OrderService.instance.allOrders(
+    limit: _limit,
+    status: _statusFilter,
+    userId: _personFilter?.uid,
+  );
 
   void _setStatusFilter(OrderStatus? status) {
     setState(() {
@@ -47,6 +60,67 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       _limit = _pageSize;
       _ordersStream = _fetchOrders();
     });
+  }
+
+  void _setPersonFilter(UserProfile? person) {
+    setState(() {
+      _personFilter = person;
+      _limit = _pageSize;
+      _ordersStream = _fetchOrders();
+    });
+  }
+
+  Future<void> _pickPerson() async {
+    if (_profiles == null) {
+      setState(() => _loadingPeople = true);
+      try {
+        final profiles = await ProfileService.instance.fetchAllProfiles();
+        if (!mounted) return;
+        _profiles = profiles;
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo cargar la lista de personas: $e')),
+        );
+        return;
+      } finally {
+        if (mounted) setState(() => _loadingPeople = false);
+      }
+    }
+    final picked = await showDialog<UserProfile>(
+      context: context,
+      builder: (context) => _PersonPickerDialog(profiles: _profiles!),
+    );
+    if (picked != null) _setPersonFilter(picked);
+  }
+
+  Widget _buildPersonFilter() {
+    final person = _personFilter;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: person == null
+            ? ActionChip(
+                avatar: _loadingPeople
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.person_search_outlined, size: 18),
+                label: const Text('Filtrar por persona'),
+                onPressed: _loadingPeople ? null : _pickPerson,
+              )
+            : InputChip(
+                avatar: const Icon(Icons.person_outline, size: 18),
+                label: Text(_personLabel(person)),
+                onPressed: _pickPerson,
+                onDeleted: () => _setPersonFilter(null),
+                deleteButtonTooltipMessage: 'Quitar filtro de persona',
+              ),
+      ),
+    );
   }
 
   /// Opens or closes the convocatoria for every non-admin user. Closing is
@@ -290,6 +364,15 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
+  String _emptyMessage() {
+    final person = _personFilter;
+    final status = _statusFilter;
+    if (person == null && status == null) return 'No hay pedidos todavía.';
+    final who = person == null ? '' : ' de ${_personLabel(person)}';
+    final where = status == null ? '' : ' en "${status.label}"';
+    return 'No hay pedidos$who$where.';
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<CardOrder>>(
@@ -355,6 +438,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
               children: [
                 _buildIntakeToggle(),
                 _buildStatusFilter(),
+                _buildPersonFilter(),
                 Expanded(
                   child: snap.connectionState == ConnectionState.waiting
                       ? const Center(child: CircularProgressIndicator())
@@ -363,9 +447,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                           child: Padding(
                             padding: const EdgeInsets.all(24),
                             child: Text(
-                              _statusFilter == null
-                                  ? 'No hay pedidos todavía.'
-                                  : 'No hay pedidos en "${_statusFilter!.label}".',
+                              _emptyMessage(),
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -428,6 +510,87 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+String _personLabel(UserProfile person) =>
+    person.displayName.isNotEmpty ? person.displayName : person.email;
+
+/// Searchable list of every customer; pops with the one tapped. Matches the
+/// name, the email or the WhatsApp, so the admin can find someone by whatever
+/// they remember — or whatever the customer wrote them on WhatsApp.
+class _PersonPickerDialog extends StatefulWidget {
+  const _PersonPickerDialog({required this.profiles});
+
+  final List<UserProfile> profiles;
+
+  @override
+  State<_PersonPickerDialog> createState() => _PersonPickerDialogState();
+}
+
+class _PersonPickerDialogState extends State<_PersonPickerDialog> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _query.trim().toLowerCase();
+    final digits = query.replaceAll(RegExp(r'[^0-9]'), '');
+    final matches = query.isEmpty
+        ? widget.profiles
+        : widget.profiles.where((p) {
+            return p.displayName.toLowerCase().contains(query) ||
+                p.email.toLowerCase().contains(query) ||
+                (digits.isNotEmpty && p.whatsapp.contains(digits));
+          }).toList();
+
+    return AlertDialog(
+      title: const Text('Filtrar por persona'),
+      content: SizedBox(
+        width: 420,
+        height: 420,
+        child: Column(
+          children: [
+            TextField(
+              autofocus: true,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                hintText: 'Nombre, correo o WhatsApp',
+              ),
+              onChanged: (v) => setState(() => _query = v),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: matches.isEmpty
+                  ? const Center(child: Text('Nadie coincide con la búsqueda.'))
+                  : ListView.builder(
+                      itemCount: matches.length,
+                      itemBuilder: (context, i) {
+                        final p = matches[i];
+                        return ListTile(
+                          dense: true,
+                          title: Text(_personLabel(p)),
+                          subtitle: Text(
+                            [
+                              if (p.displayName.isNotEmpty) p.email,
+                              if (p.whatsapp.isNotEmpty)
+                                prettyPeruNumber(p.whatsapp),
+                            ].join(' · '),
+                          ),
+                          onTap: () => Navigator.of(context).pop(p),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+      ],
     );
   }
 }

@@ -39,6 +39,20 @@ class ProfileService {
     return doc.exists ? UserProfile.fromDoc(doc) : null;
   }
 
+  /// Admin-only: every customer profile, one-time and uncapped — what the
+  /// admin panel's "Filtrar por persona" picker searches through. The
+  /// security rules only let an admin read other people's `users` documents.
+  Future<List<UserProfile>> fetchAllProfiles() async {
+    final snap = await _db.collection('users').get();
+    final profiles = snap.docs.map(UserProfile.fromDoc).toList();
+    profiles.sort(
+      (a, b) => a.displayName.toLowerCase().compareTo(
+        b.displayName.toLowerCase(),
+      ),
+    );
+    return profiles;
+  }
+
   /// Both fields are required and normalized here rather than by the caller,
   /// so this is the single place where what lands in Firestore is decided:
   /// the name trimmed and non-empty, the number as `+51XXXXXXXXX`.
