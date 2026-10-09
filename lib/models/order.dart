@@ -13,6 +13,10 @@ enum OrderStatus {
   awaitingPayment,
   ordered,
   shipped,
+  // Nombre histórico: hoy este estado significa "Listo para recojo en
+  // tienda". Se mantiene el identificador porque es lo que se guarda en
+  // Firestore (`status`), y renombrarlo dejaría los pedidos ya existentes
+  // con un valor que `fromName` no reconoce — caerían a "pendiente".
   inTransit,
   delivered,
   cancelled,
@@ -26,7 +30,7 @@ extension OrderStatusX on OrderStatus {
     OrderStatus.awaitingPayment => 'Pedido confirmado (Pendiente de pago)',
     OrderStatus.ordered => 'Comprado',
     OrderStatus.shipped => 'Enviado',
-    OrderStatus.inTransit => 'En tránsito',
+    OrderStatus.inTransit => 'Listo para recojo en tienda',
     OrderStatus.delivered => 'Entregado',
     OrderStatus.cancelled => 'Cancelado',
   };
@@ -36,6 +40,7 @@ extension OrderStatusX on OrderStatus {
   String get shortLabel => switch (this) {
     OrderStatus.priceReview => 'Ajuste de precio',
     OrderStatus.awaitingPayment => 'Pendiente de pago',
+    OrderStatus.inTransit => 'Listo para recojo',
     _ => label,
   };
 
@@ -45,7 +50,7 @@ extension OrderStatusX on OrderStatus {
   /// While an order sits in one of these the customer can't place another
   /// one: nobody has spent money on it yet, so its contents and its price can
   /// still move, and a second cart on top would be one more thing to keep in
-  /// sync. From the moment the staff buys it — and through shipping, transit,
+  /// sync. From the moment the staff buys it — and through shipping, pickup,
   /// delivery or cancellation — it stops blocking, and the customer can start
   /// a new pedido while this one is still on its way.
   bool get blocksNewOrders =>

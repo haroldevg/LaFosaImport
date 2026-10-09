@@ -30,15 +30,15 @@ const double minimumCommissionablePrice = 0.10;
 
 /// Límite superior (inclusive) del tramo de tarifa plana baja.
 const double lowCommissionMaxPrice = 2.00;
-const double lowCommissionFee = 0.35;
+const double lowCommissionFee = 0.40;
 
 /// Límite superior (inclusive) del tramo de tarifa plana media.
 const double midCommissionMaxPrice = 30.00;
-const double midCommissionFee = 1.5;
+const double midCommissionFee = 0.25;
 
 /// Por encima de [midCommissionMaxPrice] la comisión es un porcentaje del
 /// precio completo de la carta.
-const double highCommissionRate = 0.07;
+const double highCommissionRate = 0.085;
 
 /// Una fila de la tabla de comisiones, solo para mostrarla al usuario.
 class CommissionTier {
@@ -49,9 +49,9 @@ class CommissionTier {
 }
 
 const List<CommissionTier> commissionTiers = [
-  CommissionTier('\$0.10 a \$2.00', '\$0.35 por unidad'),
-  CommissionTier('\$2.01 a \$30.00', '\$1.50 por unidad'),
-  CommissionTier('Más de \$30.00', '7% del precio, por unidad'),
+  CommissionTier('\$0.10 a \$2.00', '\$0.40 por unidad'),
+  CommissionTier('\$2.01 a \$30.00', '\$0.25 por unidad'),
+  CommissionTier('Más de \$30.00', '8.5% del precio, por unidad'),
 ];
 
 /// La comisión que paga **una unidad** de una carta que cuesta [unitPrice],

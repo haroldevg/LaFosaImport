@@ -105,8 +105,12 @@ puede cambiar. Los estados que **bloquean** un pedido nuevo son *Pendiente*,
 (Pendiente de pago)*; ver `OrderStatusX.blocksNewOrders`.
 
 Apenas el staff lo marca como **Comprado** —y de ahí en adelante: *Enviado*,
-*En tránsito*, *Entregado*, *Cancelado*— el candado se libera y el cliente
-puede armar otro mientras el anterior sigue su curso.
+*Listo para recojo en tienda*, *Entregado*, *Cancelado*— el candado se libera
+y el cliente puede armar otro mientras el anterior sigue su curso.
+
+Nota: el estado *Listo para recojo en tienda* se guarda en Firestore con el
+identificador histórico `inTransit`, de cuando se llamaba "En tránsito". Se
+mantuvo el valor para no migrar los pedidos ya existentes.
 
 El candado es `users/{uid}.activeOrderId`: se toma dentro de una transacción
 al crear el pedido y lo suelta `updateOrderStatus` cuando el estado nuevo deja
