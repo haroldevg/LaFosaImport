@@ -23,9 +23,18 @@ la carta antes de sumarle nada (`lib/services/pricing_config.dart`):
 
 | Precio unitario | Comisión por unidad |
 |---|---|
-| \$0.10 a \$2.00 | \$0.25 |
-| \$2.01 a \$30.00 | \$1.30 |
-| Más de \$30.00 | 5% del precio |
+| \$0.10 a \$3.33 | \$0.40 fija |
+| \$3.34 a \$30.00 | 12% del precio |
+| Más de \$30.00 | \$3.60 + 7.5% de lo que pase de \$30.00 |
+
+La tarifa fija de \$0.40 es el mínimo por carta: rige hasta el precio en que el
+12% la alcanza (\$3.33). Pasados \$30 el porcentaje es marginal, así que la
+comisión nunca baja al subir el precio de una carta.
+
+**Compras grandes:** cuando el subtotal (cartas + envío del vendedor) pasa de
+\$150, la porción hasta \$150 paga la tabla por unidad (prorrateada) y lo que
+pasa de \$150 paga 7.5%. Es continuo en el umbral: sumar una carta nunca baja
+la comisión total del pedido.
 
 Por debajo de \$0.10 **no hay comisión definida**: el formulario de alta
 rechaza esos precios y el carrito no deja enviar el pedido, porque cobrar cero
@@ -127,7 +136,7 @@ reescribir los precios de un pedido ya enviado:
 1. **Panel admin → Editar precios**: se edita el precio unitario, el envío del
    vendedor, el vendedor y la **cantidad** de cada carta. Cualquiera de esos
    cambios rehace en vivo el subtotal, el tax, la comisión de servicio (que
-   puede saltar de tramo, o pasar al 8% si el pedido cruza los \$200) y el
+   puede cambiar de tramo, o pasar a 7.5% en la parte que cruce los \$150) y el
    envío a Perú, que depende de la cantidad total de unidades. Se usa la
    tabla vigente hoy, con el esquema con el que se cotizó el pedido (los
    pedidos de un admin conservan su esquema sin comisión y con envío

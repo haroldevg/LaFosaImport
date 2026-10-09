@@ -192,7 +192,9 @@ class _EditOrderPricesScreenState extends State<EditOrderPricesScreen> {
                 _ItemPriceEditor(
                   draft: draft,
                   chargesCommission: !widget.order.usesAdminPricing,
-                  bulkCommission: totals.commissionIsPercentage,
+                  volumeBase: totals.commissionHasVolumeRate
+                      ? totals.commissionBase
+                      : null,
                   onChanged: _onChanged,
                 ),
                 const SizedBox(height: 12),
@@ -217,10 +219,10 @@ class _EditOrderPricesScreenState extends State<EditOrderPricesScreen> {
                         totals.tax,
                       ),
                       _TotalRow(
-                        totals.commissionIsPercentage
+                        totals.commissionHasVolumeRate
                             ? 'Comisión de servicio '
-                                  '(${(bulkCommissionRate * 100).toStringAsFixed(0)}% '
-                                  'sobre ${_currency.format(totals.commissionBase)})'
+                                  '(${(bulkCommissionRate * 100).toStringAsFixed(1)}% '
+                                  'sobre lo que pasa de ${_currency.format(bulkCommissionThreshold)})'
                             : 'Comisión de servicio',
                         totals.commission,
                       ),
@@ -350,7 +352,7 @@ class _ItemPriceEditor extends StatelessWidget {
   const _ItemPriceEditor({
     required this.draft,
     required this.chargesCommission,
-    required this.bulkCommission,
+    required this.volumeBase,
     required this.onChanged,
   });
 
@@ -365,9 +367,10 @@ class _ItemPriceEditor extends StatelessWidget {
   /// mostrar su recálculo ahí solo confundiría.
   final bool chargesCommission;
 
-  /// Con los precios escritos ahora, el pedido supera el umbral y paga el
-  /// porcentaje: la tarifa por tramo de esta línea ya no aplica.
-  final bool bulkCommission;
+  /// Subtotal del pedido cuando, con los precios escritos ahora, supera el
+  /// umbral de compra grande, o null: la tarifa por tramo de esta línea se
+  /// mezcla entonces con el porcentaje de lo que pasa del umbral.
+  final double? volumeBase;
 
   @override
   Widget build(BuildContext context) {
@@ -508,9 +511,13 @@ class _ItemPriceEditor extends StatelessWidget {
                     style: TextStyle(fontSize: 13),
                   ),
                   Text(
-                    bulkCommission
-                        ? '${(bulkCommissionRate * 100).toStringAsFixed(0)}% = '
-                              '${_currency.format(bulkCommissionForItem(draft.toItem()))}'
+                    volumeBase != null
+                        ? _currency.format(
+                            commissionShareWithVolume(
+                              draft.toItem(),
+                              volumeBase!,
+                            ),
+                          )
                         : unitCommission == null
                         ? 'sin comisión definida'
                         : '${_currency.format(unitCommission)} c/u × '
@@ -519,9 +526,9 @@ class _ItemPriceEditor extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: (!bulkCommission && unitCommission == null)
+                      color: (volumeBase == null && unitCommission == null)
                           ? Theme.of(context).colorScheme.error
-                          : (!bulkCommission &&
+                          : (volumeBase == null &&
                                 unitCommission != previousUnitCommission)
                           ? Colors.orange
                           : null,
@@ -529,13 +536,13 @@ class _ItemPriceEditor extends StatelessWidget {
                   ),
                 ],
               ),
-              if (bulkCommission)
+              if (volumeBase != null)
                 Align(
                   alignment: Alignment.centerRight,
                   child: Text(
                     'El pedido supera '
-                    '${_currency.format(bulkCommissionThreshold)}: paga '
-                    'porcentaje, no tarifa por tramo',
+                    '${_currency.format(bulkCommissionThreshold)}: lo que '
+                    'pasa de ese monto paga porcentaje, no tarifa por tramo',
                     style: const TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                 )

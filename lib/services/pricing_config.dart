@@ -19,26 +19,30 @@ double internationalShippingFeeFor(bool isAdmin) => isAdmin
 // ── Comisión de servicio, por unidad ──────────────────────────────────────
 //
 // Cada unidad comprada paga una sola comisión, elegida por el precio
-// unitario de la carta (antes de sumarle la comisión). Como la tabla es
-// plana en los dos primeros tramos, una carta barata paga centavos y una
-// cara paga un porcentaje; igual que el envío a Perú, es un cobro propio del
-// negocio y nunca entra en la base del tax estimado de EE. UU.
+// unitario de la carta (antes de sumarle la comisión): una tarifa fija mínima
+// para las cartas baratas y un porcentaje del precio desde ahí. Igual que el
+// envío a Perú, es un cobro propio del negocio y nunca entra en la base del
+// tax estimado de EE. UU.
 
 /// Por debajo de este precio no hay comisión definida: la tabla empieza en
 /// US$ 0.10 y suponer un valor más abajo sería inventar un precio.
 const double minimumCommissionablePrice = 0.10;
 
-/// Límite superior (inclusive) del tramo de tarifa plana baja.
-const double lowCommissionMaxPrice = 2.00;
-const double lowCommissionFee = 0.35;
+/// Comisión mínima por unidad. Rige mientras el [commissionRate] del precio
+/// no la supere (hasta ~US$ 3.33): el trabajo de comprar y entregar una carta
+/// es el mismo valga centavos o dólares.
+const double flatCommissionFee = 0.40;
 
-/// Límite superior (inclusive) del tramo de tarifa plana media.
-const double midCommissionMaxPrice = 30.00;
-const double midCommissionFee = 1.5;
+/// Porcentaje del precio unitario que se cobra una vez superado el mínimo.
+const double commissionRate = 0.12;
 
-/// Por encima de [midCommissionMaxPrice] la comisión es un porcentaje del
-/// precio completo de la carta.
-const double highCommissionRate = 0.07;
+/// Hasta este precio (inclusive) rige [commissionRate] sobre todo el precio.
+const double commissionRateMaxPrice = 30.00;
+
+/// Porcentaje sobre la parte del precio que pase de [commissionRateMaxPrice].
+/// Es marginal —lo anterior sigue pagando [commissionRate]— para que la
+/// comisión nunca baje al subir el precio.
+const double highCommissionRate = 0.075;
 
 /// Una fila de la tabla de comisiones, solo para mostrarla al usuario.
 class CommissionTier {
@@ -49,9 +53,12 @@ class CommissionTier {
 }
 
 const List<CommissionTier> commissionTiers = [
-  CommissionTier('\$0.10 a \$2.00', '\$0.35 por unidad'),
-  CommissionTier('\$2.01 a \$30.00', '\$1.50 por unidad'),
-  CommissionTier('Más de \$30.00', '7% del precio, por unidad'),
+  CommissionTier('\$0.10 a \$3.33', '\$0.40 por unidad'),
+  CommissionTier('\$3.34 a \$30.00', '12% del precio, por unidad'),
+  CommissionTier(
+    'Más de \$30.00',
+    '\$3.60 + 7.5% de lo que pase de \$30.00, por unidad',
+  ),
 ];
 
 /// La comisión que paga **una unidad** de una carta que cuesta [unitPrice],
@@ -59,14 +66,18 @@ const List<CommissionTier> commissionTiers = [
 /// [minimumCommissionablePrice], donde la tabla no define ninguna.
 ///
 /// El tramo se elige con el precio unitario tal cual, antes de sumarle nada,
-/// y se redondea a centavos antes de comparar para que un precio como 2.00
+/// y se redondea a centavos antes de comparar para que un precio como 30.00
 /// caiga en su tramo sin depender de cómo el binario represente el decimal.
 double? commissionPerUnit(double unitPrice) {
   final price = double.parse(unitPrice.toStringAsFixed(2));
   if (price < minimumCommissionablePrice) return null;
-  if (price <= lowCommissionMaxPrice) return lowCommissionFee;
-  if (price <= midCommissionMaxPrice) return midCommissionFee;
-  return double.parse((price * highCommissionRate).toStringAsFixed(2));
+  if (price <= commissionRateMaxPrice) {
+    final byRate = double.parse((price * commissionRate).toStringAsFixed(2));
+    return byRate < flatCommissionFee ? flatCommissionFee : byRate;
+  }
+  final atMax = commissionRateMaxPrice * commissionRate;
+  final above = (price - commissionRateMaxPrice) * highCommissionRate;
+  return double.parse((atMax + above).toStringAsFixed(2));
 }
 
 /// La comisión de toda una línea del carrito: la comisión unitaria por la
@@ -78,17 +89,26 @@ double? commissionForItem(OrderItem item) {
   return double.parse((perUnit * item.quantity).toStringAsFixed(2));
 }
 
-/// Cuando la compra supera este monto, la tabla por unidad deja de aplicar y
-/// el pedido entero paga [bulkCommissionRate] sobre el subtotal de compra.
+/// Descuento por compra grande: la parte del subtotal que pasa de este monto
+/// ya no paga la tabla por unidad sino [bulkCommissionRate].
 const double bulkCommissionThreshold = 150.00;
 const double bulkCommissionRate = 0.075;
 
-/// Lo que le toca a una línea cuando el carrito paga el porcentaje: su propio
-/// subtotal por la tasa. Es un desglose informativo — los redondeos por línea
-/// pueden sumar uno o dos centavos distinto del cobro del carrito, que es el
-/// que manda.
-double bulkCommissionForItem(OrderItem item) =>
-    double.parse((item.lineTotal * bulkCommissionRate).toStringAsFixed(2));
+/// Lo que le toca a una línea cuando el carrito supera el umbral: su parte de
+/// la tabla por unidad (prorrateada a la porción del pedido que no pasa del
+/// umbral) más su parte de lo que sí pasa. Es un desglose informativo — los
+/// redondeos por línea pueden sumar uno o dos centavos distinto del cobro del
+/// carrito, que es el que manda.
+double commissionShareWithVolume(OrderItem item, double cartBase) {
+  final table = commissionForItem(item) ?? 0;
+  final tableShare = table * bulkCommissionThreshold / cartBase;
+  final overShare =
+      bulkCommissionRate *
+      item.lineTotal *
+      (cartBase - bulkCommissionThreshold) /
+      cartBase;
+  return double.parse((tableShare + overShare).toStringAsFixed(2));
+}
 
 /// La comisión de servicio de todo un carrito, junto con el detalle de cómo
 /// salió, para que la pantalla pueda explicarla en vez de mostrar un número
@@ -96,22 +116,20 @@ double bulkCommissionForItem(OrderItem item) =>
 class CartCommission {
   final double amount;
 
-  /// true cuando se aplicó el porcentaje por superar el umbral, en vez de la
-  /// tabla por unidad.
-  final bool isPercentage;
+  /// true cuando el subtotal superó [bulkCommissionThreshold] y la parte que
+  /// pasa del umbral se cobró a [bulkCommissionRate].
+  final bool hasVolumeRate;
 
   /// Subtotal de compra (cartas + envío del vendedor) sobre el que se midió
-  /// el umbral y, cuando aplica, se calculó el porcentaje.
+  /// el umbral.
   final double base;
 
-  /// Líneas sin comisión definida (precio bajo el mínimo). Siempre 0 cuando
-  /// manda el porcentaje: ahí la comisión la paga el carrito completo, así
-  /// que el precio de una carta suelta ya no deja nada sin cobrar.
+  /// Líneas sin comisión definida (precio bajo el mínimo).
   final int itemsWithoutCommission;
 
   const CartCommission({
     required this.amount,
-    required this.isPercentage,
+    required this.hasVolumeRate,
     required this.base,
     required this.itemsWithoutCommission,
   });
@@ -120,9 +138,10 @@ class CartCommission {
 /// Comisión de servicio del carrito.
 ///
 /// Hasta [bulkCommissionThreshold] inclusive se cobra la tabla por unidad: una
-/// comisión por cada unidad, según el precio de su carta. Pasado ese monto, el
-/// pedido entero paga [bulkCommissionRate] del subtotal de compra — un cobro
-/// único que **reemplaza** a los de cada línea, no se suma a ellos.
+/// comisión por cada unidad, según el precio de su carta. Pasado ese monto, la
+/// tabla se aplica a la porción del pedido que llega al umbral (prorrateada) y
+/// lo que lo excede paga [bulkCommissionRate]. Es continuo en el umbral: sumar
+/// una carta nunca baja la comisión total.
 CartCommission commissionForCart(List<OrderItem> items) {
   final base = double.parse(
     items
@@ -130,16 +149,7 @@ CartCommission commissionForCart(List<OrderItem> items) {
         .toStringAsFixed(2),
   );
 
-  if (base > bulkCommissionThreshold) {
-    return CartCommission(
-      amount: double.parse((base * bulkCommissionRate).toStringAsFixed(2)),
-      isPercentage: true,
-      base: base,
-      itemsWithoutCommission: 0,
-    );
-  }
-
-  var amount = 0.0;
+  var table = 0.0;
   var missing = 0;
   for (final item in items) {
     final lineCommission = commissionForItem(item);
@@ -147,11 +157,23 @@ CartCommission commissionForCart(List<OrderItem> items) {
       missing++;
       continue;
     }
-    amount += lineCommission;
+    table += lineCommission;
+  }
+
+  if (base > bulkCommissionThreshold) {
+    final amount =
+        table * bulkCommissionThreshold / base +
+        bulkCommissionRate * (base - bulkCommissionThreshold);
+    return CartCommission(
+      amount: double.parse(amount.toStringAsFixed(2)),
+      hasVolumeRate: true,
+      base: base,
+      itemsWithoutCommission: missing,
+    );
   }
   return CartCommission(
-    amount: double.parse(amount.toStringAsFixed(2)),
-    isPercentage: false,
+    amount: double.parse(table.toStringAsFixed(2)),
+    hasVolumeRate: false,
     base: base,
     itemsWithoutCommission: missing,
   );
@@ -185,13 +207,12 @@ class OrderTotals {
   /// costó cero: quien muestre estos totales tiene que advertirlo.
   final int itemsWithoutCommission;
 
-  /// true cuando la comisión salió del porcentaje por compra grande y no de
-  /// la tabla por unidad — la pantalla lo dice para que el monto no parezca
-  /// salido de la nada.
-  final bool commissionIsPercentage;
+  /// true cuando el subtotal superó el umbral de compra grande y la parte que
+  /// lo excede pagó el porcentaje en vez de la tabla por unidad — la pantalla
+  /// lo dice para que el monto no parezca salido de la nada.
+  final bool commissionHasVolumeRate;
 
-  /// Subtotal de compra sobre el que se midió el umbral y se calculó el
-  /// porcentaje cuando aplica.
+  /// Subtotal de compra sobre el que se midió el umbral.
   final double commissionBase;
 
   const OrderTotals({
@@ -203,7 +224,7 @@ class OrderTotals {
     required this.total,
     required this.totalQuantity,
     this.itemsWithoutCommission = 0,
-    this.commissionIsPercentage = false,
+    this.commissionHasVolumeRate = false,
     this.commissionBase = 0,
   });
 
@@ -245,7 +266,7 @@ class OrderTotals {
       ),
       totalQuantity: totalQuantity,
       itemsWithoutCommission: itemsWithoutCommission,
-      commissionIsPercentage: !adminPricing && cartCommission.isPercentage,
+      commissionHasVolumeRate: !adminPricing && cartCommission.hasVolumeRate,
       commissionBase: cartCommission.base,
     );
   }
