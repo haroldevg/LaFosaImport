@@ -116,6 +116,15 @@ class OrderService {
     return _byOldestFirst(snap);
   }
 
+  /// One-time, uncapped fetch of every order in any status — the "Todos los
+  /// pedidos" export. Fetched without `orderBy` and sorted here, because an
+  /// `orderBy('createdAt')` query silently drops any document that lacks the
+  /// field, and a full export must not leave an order out. Newest first.
+  Future<List<CardOrder>> everyOrder() async {
+    final snap = await _db.collection('orders').get();
+    return _byOldestFirst(snap).reversed.toList();
+  }
+
   /// Oldest first, so a report reads as a queue — whoever has been waiting
   /// longest is at the top. Sorted here rather than with `orderBy` because
   /// combining it with the status filter would need a composite index for
@@ -351,7 +360,9 @@ class OrderService {
       // so only that one transition needs to touch the user doc. Every later
       // one (shipped, inTransit, delivered, cancelled-after-ordered) would
       // just re-read a lock that's already cleared.
-      final currentStatus = OrderStatusX.fromName(orderData['status'] as String);
+      final currentStatus = OrderStatusX.fromName(
+        orderData['status'] as String,
+      );
       final releasesLock =
           currentStatus.blocksNewOrders && !newStatus.blocksNewOrders;
 

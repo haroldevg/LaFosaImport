@@ -10,7 +10,7 @@ import 'edit_order_prices_screen.dart';
 
 /// The two Excel reports the panel can produce: what still has to be bought,
 /// and what was already bought and has to be delivered.
-enum _ExportKind { pending, purchased }
+enum _ExportKind { pending, purchased, all }
 
 class AdminOrdersScreen extends StatefulWidget {
   const AdminOrdersScreen({super.key});
@@ -334,10 +334,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             children: [
               for (final chip in chips)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: chip,
-                ),
+                Padding(padding: const EdgeInsets.only(right: 8), child: chip),
             ],
           ),
         );
@@ -411,6 +408,12 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                         ),
                     emptyMessage: 'No hay pedidos comprados por entregar.',
                   ),
+                  _ExportKind.all => _runExport(
+                    () async => OrderExportService.instance.exportAllOrders(
+                      await OrderService.instance.everyOrder(),
+                    ),
+                    emptyMessage: 'No hay pedidos para exportar.',
+                  ),
                 },
                 itemBuilder: (context) => const [
                   PopupMenuItem(
@@ -426,6 +429,14 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                     child: ListTile(
                       leading: Icon(Icons.local_shipping_outlined),
                       title: Text('Comprados por entregar'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _ExportKind.all,
+                    child: ListTile(
+                      leading: Icon(Icons.table_view_outlined),
+                      title: Text('Todos los pedidos'),
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),

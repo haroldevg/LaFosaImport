@@ -53,7 +53,107 @@ class OrderExportService {
     'Total línea',
   ];
 
+  static const _allSummaryHeaders = [
+    'ID pedido',
+    'Fecha pedido',
+    'Última actualización',
+    'Cliente',
+    'Correo',
+    'WhatsApp',
+    'Estado',
+    'Unidades',
+    'Líneas',
+    'Subtotal',
+    'Impuesto',
+    'Comisión',
+    'Envío a Perú',
+    'Total',
+    'Precio referencial',
+  ];
+
+  static const _allDetailHeaders = [
+    'ID pedido',
+    'Fecha pedido',
+    'Cliente',
+    'Estado',
+    'Carta',
+    'Set',
+    'Condición',
+    'Cantidad',
+    'Vendedor',
+    'Link',
+    'Precio unitario',
+    'Envío',
+    'Total línea',
+    'Precio referencial',
+  ];
+
   final _dateFmt = DateFormat('yyyy-MM-dd HH:mm');
+
+  /// Every order in every status, newest first. Two sheets: "Pedidos" is one
+  /// row per order with its money breakdown, "Detalle" is one row per card
+  /// tagged with its order id, so either can be filtered or pivoted in Excel.
+  ///
+  /// Returns the number of orders exported, or 0 if there were none.
+  Future<int> exportAllOrders(List<CardOrder> orders) async {
+    if (orders.isEmpty) return 0;
+
+    final excel = _newWorkbook(['Pedidos', 'Detalle']);
+    final summary = excel['Pedidos'];
+    final detail = excel['Detalle'];
+    summary.appendRow(_allSummaryHeaders.map(TextCellValue.new).toList());
+    detail.appendRow(_allDetailHeaders.map(TextCellValue.new).toList());
+
+    String fmt(DateTime? d) => d != null ? _dateFmt.format(d) : '';
+
+    for (final order in orders) {
+      final units = order.items.fold<int>(0, (acc, i) => acc + i.quantity);
+      summary.appendRow([
+        TextCellValue(order.id),
+        TextCellValue(fmt(order.createdAt)),
+        TextCellValue(fmt(order.updatedAt)),
+        TextCellValue(order.userDisplayName),
+        TextCellValue(order.userEmail),
+        TextCellValue(order.userWhatsapp),
+        TextCellValue(order.status.label),
+        IntCellValue(units),
+        IntCellValue(order.items.length),
+        DoubleCellValue(order.estimatedSubtotal),
+        DoubleCellValue(order.estimatedTax),
+        DoubleCellValue(order.estimatedMargin),
+        DoubleCellValue(order.estimatedInternationalShipping),
+        DoubleCellValue(order.estimatedTotal),
+        TextCellValue(order.hasReferencePriceItem ? 'Sí' : 'No'),
+      ]);
+
+      for (final item in order.items) {
+        detail.appendRow([
+          TextCellValue(order.id),
+          TextCellValue(fmt(order.createdAt)),
+          TextCellValue(order.userDisplayName),
+          TextCellValue(order.status.label),
+          TextCellValue(item.cardName),
+          TextCellValue(item.setName),
+          TextCellValue(item.condition),
+          IntCellValue(item.quantity),
+          TextCellValue(item.sellerName ?? ''),
+          TextCellValue(item.listingUrl ?? ''),
+          DoubleCellValue(item.unitPrice),
+          DoubleCellValue(item.shipping),
+          DoubleCellValue(item.lineTotal),
+          TextCellValue(item.isReferencePrice ? 'Sí' : 'No'),
+        ]);
+      }
+    }
+
+    await _shareWorkbook(
+      excel,
+      fileNamePrefix: 'todos_los_pedidos',
+      subject: 'Todos los pedidos',
+      text: '${orders.length} pedido(s) — exportado desde La Fosa Store.',
+    );
+    return orders.length;
+  }
 
   /// Shopping list (one row per card) for every order the staff still has to
   /// go buy on TCGPlayer (see [OrderStatusX.isReadyToBuy]). Orders still
